@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SEEKER
+  BROKER
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model User {
+  id                          String          @id @default(uuid())
+  email                       String          @unique
+  passwordHash                String?
+  name                        String
+  role                        UserRole        @default(SEEKER)
+  brokerCompanyName           String?
+  brokerPhone                 String?
+  brokerOnboardingCompleted  Boolean         @default(false)
+  createdAt                   DateTime        @default(now())
+  updatedAt                   DateTime        @updatedAt
+  oauthAccounts               OAuthAccount[]
+  listingsOwned               Listing[]       @relation("ListingOwner")
+  viewingAsSeeker             ViewingAppointment[] @relation("AppointmentSeeker")
+  viewingAsHost               ViewingAppointment[] @relation("AppointmentHost")
+}
+
+model OAuthAccount {
+  id                String   @id @default(uuid())
+  provider          String
+  providerAccountId String
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Listing {
+  id            String         @id
+  title         String
+  subtitle      String
+  description   String         @default("")
+  priceEur      Int
+  roomsCount    Int            // 0 => studio
+  sqm           Int
+  lat           Float
+  lng           Float
+  highlights    Json           @default("[]")
+  coverImageSrc String
+  dealType      String         @default("rent") // "rent" | "sale"
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  ownerUserId   String?
+  owner         User?          @relation("ListingOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  images         ListingImage[]
+  appointments   ViewingAppointment[]
+
+  @@index([isActive])
+  @@index([priceEur])
+  @@index([dealType])
+  @@index([ownerUserId])
+}
+
+model ViewingAppointment {
+  id         String              @id @default(uuid())
+  listingId  String
+  listing    Listing             @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  seekerId   String
+  seeker     User                @relation("AppointmentSeeker", fields: [seekerId], references: [id], onDelete: Cascade)
+  hostId     String
+  host       User                @relation("AppointmentHost", fields: [hostId], references: [id], onDelete: Cascade)
+  startsAt   DateTime
+  message    String?
+  status     AppointmentStatus   @default(PENDING)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@index([listingId])
+  @@index([seekerId])
+  @@index([hostId])
+  @@index([startsAt])
+}
+
+model ListingImage {
+  id        String   @id @default(uuid())
+  listingId String
+  src       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+}
+

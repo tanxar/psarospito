@@ -1,0 +1,64 @@
+"use client";
+
+import { X } from "lucide-react";
+
+import type { Filters } from "@/components/listings/types";
+
+type ClearKey = keyof Filters | "features" | "location";
+
+function humanize(filters: Filters): { key: ClearKey; label: string }[] {
+  const out: { key: ClearKey; label: string }[] = [];
+  if (typeof filters.priceMinEur === "number") out.push({ key: "priceMinEur", label: `From €${filters.priceMinEur}` });
+  if (typeof filters.priceMaxEur === "number") out.push({ key: "priceMaxEur", label: `Up to €${filters.priceMaxEur}` });
+  if (typeof filters.sqmMin === "number") out.push({ key: "sqmMin", label: `From ${filters.sqmMin} m²` });
+  if (typeof filters.sqmMax === "number") out.push({ key: "sqmMax", label: `Up to ${filters.sqmMax} m²` });
+  if (filters.rooms) out.push({ key: "rooms", label: `${filters.rooms} rooms` });
+  const feats: string[] = [];
+  if (filters.parking) feats.push("Parking");
+  if (filters.balcony) feats.push("Balcony");
+  if (filters.pets) feats.push("Pets");
+  if (filters.elevator) feats.push("Elevator");
+  if (filters.renovated) feats.push("Renovated");
+  if (filters.bright) feats.push("Bright");
+  if (feats.length) out.push({ key: "features", label: feats.join(" · ") });
+
+  const loc: string[] = [];
+  if (filters.nearMetro) loc.push("Near metro");
+  if (filters.nearTram) loc.push("Near tram");
+  if (loc.length) out.push({ key: "location", label: loc.join(" · ") });
+
+  return out;
+}
+
+export function AppliedFilters({
+  filters,
+  onClear,
+}: {
+  filters: Filters;
+  onClear: (key: ClearKey) => void;
+}) {
+  const pills = humanize(filters);
+  if (!pills.length) return null;
+
+  return (
+    <div className="mt-1.5 flex gap-1.5 overflow-x-auto whitespace-nowrap pr-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      {pills.map((p) => (
+        <div
+          key={`${p.key}-${p.label}`}
+          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-border/60 bg-card px-2 text-xs text-foreground"
+        >
+          <span>{p.label}</span>
+          <button
+            type="button"
+            onClick={() => onClear(p.key)}
+            aria-label={`Clear ${p.label}`}
+            className="inline-flex size-4 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+

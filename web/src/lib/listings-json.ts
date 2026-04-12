@@ -1,0 +1,20 @@
+import type { Listing, ListingImage } from "@prisma/client";
+
+export type ListingWithImages = Listing & { images: ListingImage[] };
+
+export function listingToJson(r: ListingWithImages) {
+  return {
+    id: r.id,
+    title: r.title,
+    subtitle: r.subtitle,
+    description: r.description ?? "",
+    priceEur: r.priceEur,
+    roomsCount: r.roomsCount,
+    sqm: r.sqm,
+    highlights: Array.isArray(r.highlights) ? (r.highlights as string[]) : [],
+    imageSrc: r.coverImageSrc,
+    images: r.images.map((i) => i.src),
+    dealType: r.dealType === "sale" ? ("sale" as const) : ("rent" as const),
+    location: { lat: r.lat, lng: r.lng },
+  };
+}
