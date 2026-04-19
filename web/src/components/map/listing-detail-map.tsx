@@ -18,14 +18,15 @@ const MapViewLeaflet = dynamic(
 );
 
 export function ListingDetailMap({ listing }: { listing: Listing }) {
+  const precision = listing.locationPrecision === "exact" ? "exact" : "approximate";
   return (
     <MapViewLeaflet
       listings={[listing]}
       heightClassName="h-[200px] min-h-[180px] sm:h-[240px]"
       activeId={listing.id}
       className="rounded-xl border-0 shadow-none sm:rounded-xl"
-      mapLabel="Περίπου εδώ"
-      locationPrecision="approximate"
+      mapLabel={precision === "exact" ? "Ακριβές σημείο" : "Περίπου εδώ"}
+      locationPrecision={precision}
     />
   );
 }

@@ -12,6 +12,10 @@ export type Listing = {
   images?: string[];
   /** "rent" = ενοικίαση, "sale" = πώληση */
   dealType?: "rent" | "sale";
+  /** Προαιρετικό — π.χ. στη σελίδα «Οι αγγελίες μου» */
+  isActive?: boolean;
+  addressLine?: string;
+  locationPrecision?: "exact" | "approximate";
   location: {
     lat: number;
     lng: number;

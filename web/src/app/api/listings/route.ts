@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getSessionUserFromRequest } from "@/lib/auth-user";
 import { prisma } from "@/db/prisma";
 import { listingToJson } from "@/lib/listings-json";
+import { generateDecor8Designs, isDecor8Configured } from "@/lib/decor8";
 import {
   buildPrismaListingsWhere,
   hasAnyPostFilter,
@@ -14,9 +15,22 @@ import {
 } from "@/lib/listings-query";
 
 export const dynamic = "force-dynamic";
+const MAX_LISTING_IMAGES = 300;
 
 function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
+}
+
+function parseImageList(value: unknown, maxLen = 2048) {
+  if (!Array.isArray(value)) return [];
+  const list: string[] = [];
+  for (const x of value) {
+    if (typeof x !== "string") continue;
+    const src = x.trim();
+    if (!src || src.length > maxLen) continue;
+    list.push(src);
+  }
+  return list;
 }
 
 export async function GET(req: Request) {
@@ -104,6 +118,14 @@ export async function POST(req: Request) {
           coverImageSrc?: unknown;
           dealType?: unknown;
           images?: unknown;
+          sourceImages?: unknown;
+          generateAiRedesigns?: unknown;
+          aiVariantsPerImage?: unknown;
+          aiRoomType?: unknown;
+          aiDesignStyle?: unknown;
+          aiColorScheme?: unknown;
+          addressLine?: unknown;
+          addressVisibility?: unknown;
         };
 
     if (!body || typeof body.title !== "string" || !body.title.trim()) {
@@ -133,27 +155,54 @@ export async function POST(req: Request) {
 
     const descriptionRaw = typeof body.description === "string" ? body.description : "";
     const description = descriptionRaw.trim().slice(0, 8000);
+    const addressLine = typeof body.addressLine === "string" ? body.addressLine.trim().slice(0, 240) : "";
+    const addressVisibility = body.addressVisibility === "exact" ? "exact" : "approximate";
     const coverImageSrc =
       typeof body.coverImageSrc === "string" && body.coverImageSrc.trim()
         ? body.coverImageSrc.trim()
-        : "/listings/photos/apt1.jpg";
+        : "";
 
     const dealType = body.dealType === "sale" ? "sale" : "rent";
 
-    const imageRows: { src: string; sortOrder: number }[] = [];
-    if (Array.isArray(body.images)) {
-      const max = 24;
-      const maxLen = 2048;
-      let order = 0;
-      for (const x of body.images) {
-        if (order >= max) break;
-        if (typeof x !== "string") continue;
-        const src = x.trim();
-        if (!src || src.length > maxLen) continue;
-        imageRows.push({ src, sortOrder: order });
-        order += 1;
+    const fallbackImages = parseImageList(body.images);
+    const sourceImages = parseImageList(body.sourceImages);
+    const uploadedImages = sourceImages.length > 0 ? sourceImages : fallbackImages;
+    const generateAiRedesigns = body.generateAiRedesigns === true;
+    const aiVariantsPerImage = Number(body.aiVariantsPerImage);
+    const aiRoomType = typeof body.aiRoomType === "string" && body.aiRoomType.trim() ? body.aiRoomType.trim() : "livingroom";
+    const aiDesignStyle =
+      typeof body.aiDesignStyle === "string" && body.aiDesignStyle.trim() ? body.aiDesignStyle.trim() : "modern";
+    const aiColorScheme =
+      typeof body.aiColorScheme === "string" && body.aiColorScheme.trim() ? body.aiColorScheme.trim() : undefined;
+
+    if (generateAiRedesigns && uploadedImages.length === 0) {
+      return jsonError("Για AI παραλλαγές χρειάζεσαι τουλάχιστον 1 φωτογραφία", 400);
+    }
+    if (generateAiRedesigns && (!Number.isFinite(aiVariantsPerImage) || aiVariantsPerImage < 1 || aiVariantsPerImage > 10)) {
+      return jsonError("Οι παραλλαγές ανά φωτογραφία πρέπει να είναι 1-10", 400);
+    }
+    if (generateAiRedesigns && !isDecor8Configured()) {
+      return jsonError("Λείπει το DECOR8_API_KEY στο περιβάλλον", 400);
+    }
+
+    let generatedImages: string[] = [];
+    if (generateAiRedesigns) {
+      try {
+        generatedImages = await generateDecor8Designs({
+          inputImageUrls: uploadedImages,
+          variantsPerImage: Math.floor(aiVariantsPerImage),
+          roomType: aiRoomType,
+          designStyle: aiDesignStyle,
+          colorScheme: aiColorScheme,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Decor8 failed";
+        return jsonError(`Αποτυχία AI ανακαίνισης: ${message}`, 502);
       }
     }
+
+    const allListingImages = [...new Set([...uploadedImages, ...generatedImages])].slice(0, MAX_LISTING_IMAGES);
+    const imageRows = allListingImages.map((src, index) => ({ src, sortOrder: index }));
 
     const id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
 
@@ -168,6 +217,8 @@ export async function POST(req: Request) {
         sqm: Math.round(sqm),
         lat,
         lng,
+        addressLine,
+        addressVisibility,
         highlights,
         coverImageSrc,
         dealType,

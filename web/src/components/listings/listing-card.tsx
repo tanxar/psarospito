@@ -95,6 +95,16 @@ export function ListingCard({
             >
               {(listing.dealType ?? "rent") === "sale" ? "Πώληση" : "Ενοικίαση"}
             </div>
+            {listing.isActive === false ? (
+              <div
+                className={cn(
+                  "rounded-full border border-amber-400/40 bg-amber-950/65 font-semibold text-amber-50 shadow-sm backdrop-blur-md",
+                  compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]"
+                )}
+              >
+                Ανενεργή
+              </div>
+            ) : null}
             {!compact ? (
               <div className="rounded-full border border-white/20 bg-black/35 px-2.5 py-1 text-[11px] font-medium text-white/90 backdrop-blur-md">
                 Επαληθευμένο

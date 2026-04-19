@@ -57,6 +57,8 @@ model Listing {
   sqm           Int
   lat           Float
   lng           Float
+  addressLine   String         @default("")
+  addressVisibility String     @default("approximate") // "exact" | "approximate"
   highlights    Json           @default("[]")
   coverImageSrc String
   dealType      String         @default("rent") // "rent" | "sale"

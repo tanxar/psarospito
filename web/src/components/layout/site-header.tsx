@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type CSSProperties } from "react";
-import { Building2, ChevronRight, Heart, LogIn, Plus, User, UserRound } from "lucide-react";
+import { Building2, ChevronRight, Heart, LayoutList, LogIn, Plus, User, UserRound } from "lucide-react";
 
 import { useSessionUser } from "@/components/auth/use-session";
 import { useSavedListings } from "@/components/saved/use-saved";
@@ -141,6 +141,15 @@ export function SiteHeader() {
                     <span className="min-w-0 flex-1 font-medium">Λογαριασμός</span>
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground/45" aria-hidden />
                   </DropdownMenuItem>
+                  {user.role === "BROKER" ? (
+                    <DropdownMenuItem className={accountMenuItemClass} onClick={() => router.push("/listings/mine")}>
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/70 text-muted-foreground">
+                        <LayoutList className="size-4" aria-hidden />
+                      </span>
+                      <span className="min-w-0 flex-1 font-medium">Οι αγγελίες μου</span>
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground/45" aria-hidden />
+                    </DropdownMenuItem>
+                  ) : null}
                 </DropdownMenuGroup>
               ) : (
                 <>

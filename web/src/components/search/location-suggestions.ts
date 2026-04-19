@@ -35,6 +35,44 @@ function B(minLat: number, maxLat: number, minLng: number, maxLng: number): GeoB
   return { minLat, maxLat, minLng, maxLng };
 }
 
+/** Bbox για φίλτρο αναζήτησης γύρω από σημείο από geocoder (~3 km). */
+export function bboxAroundPoint(lat: number, lng: number, dLat = 0.026, dLng = 0.032): GeoBBox {
+  return { minLat: lat - dLat, maxLat: lat + dLat, minLng: lng - dLng, maxLng: lng + dLng };
+}
+
+/**
+ * Μετατρέπει αποτέλεσμα `/api/geocode/search` σε πρόταση για chips + API areas.
+ * Εμφάνιση «πρώτο • δεύτερο» όπως κλασικά autocomplete περιοχών.
+ */
+export function locationSuggestionFromGeocodeLabel(
+  label: string,
+  lat: number,
+  lng: number,
+  dedupeSalt: number
+): LocationSuggestion {
+  const parts = label
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  let display = label.trim();
+  if (parts.length >= 2) {
+    display = `${parts[0]} • ${parts[1]}`;
+  }
+  const id = `gc_${dedupeSalt}_${lat.toFixed(5)}_${lng.toFixed(5)}`.replace(/\./g, "d");
+  return {
+    id,
+    label: display,
+    q: parts[0] ?? label,
+    bbox: bboxAroundPoint(lat, lng),
+    rank: 350,
+  };
+}
+
+/** Κλειδί για αποφυγή διπλών μεταξύ στατικών + geocode εγγραφών. */
+export function suggestionDedupeKey(s: LocationSuggestion): string {
+  return foldGreek(s.label.replace(/\s*•\s*/g, " ").trim());
+}
+
 /** Προσεγγιστικό κουτί γύρω από σημείο (~3–4 km). */
 function near(lat: number, lng: number, dLat = 0.02, dLng = 0.024): GeoBBox {
   return { minLat: lat - dLat, maxLat: lat + dLat, minLng: lng - dLng, maxLng: lng + dLng };

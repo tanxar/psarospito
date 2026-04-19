@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ArrowLeft, Building2, FileText, MapPin, Sparkles } from "lucide-react";
+import { ArrowLeft, Building2, FileText, MapPin, PenLine, Sparkles } from "lucide-react";
 
 import { prisma } from "@/db/prisma";
+import { getSessionUserFromRequest } from "@/lib/auth-user";
 import { ListingDescriptionExpand } from "@/components/listings/listing-description-expand";
 import { ListingFavoritesNavLink } from "@/components/listings/listing-favorites-nav-link";
 import { ListingHighlightsGrid } from "@/components/listings/listing-highlights-grid";
@@ -115,6 +116,7 @@ export default async function ListingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const session = await getSessionUserFromRequest();
   const listing = await prisma.listing.findUnique({
     where: { id },
     include: {
@@ -157,6 +159,8 @@ export default async function ListingPage({
         imageSrc: listing.coverImageSrc,
         images: gallery,
         dealType: listing.dealType === "sale" ? "sale" : "rent",
+        addressLine: listing.addressLine ?? "",
+        locationPrecision: listing.addressVisibility === "exact" ? "exact" : "approximate",
         location: { lat: listing.lat, lng: listing.lng },
       }
     : null;
@@ -200,6 +204,12 @@ export default async function ListingPage({
     ];
   }
 
+  const showOwnerEdit =
+    !!listing &&
+    session?.role === "BROKER" &&
+    !!listing.ownerUserId &&
+    session.id === listing.ownerUserId;
+
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
       <div
@@ -229,7 +239,21 @@ export default async function ListingPage({
                 <span className="hidden sm:inline">Λίστα αγγελιών</span>
                 <span className="sm:hidden">Πίσω</span>
               </Link>
-              <ListingFavoritesNavLink listingId={listing.id} />
+              <div className="flex shrink-0 items-center gap-2">
+                {showOwnerEdit ? (
+                  <Link
+                    href={`/listings/${listing.id}/edit`}
+                    className={cn(
+                      buttonVariants({ variant: "secondary", size: "sm" }),
+                      "inline-flex h-10 items-center gap-2 rounded-full border-border/60 bg-card/90 px-4 text-foreground shadow-sm ring-1 ring-black/[0.03] sm:h-9"
+                    )}
+                  >
+                    <PenLine className="size-4 shrink-0" aria-hidden />
+                    <span className="hidden sm:inline">Επεξεργασία</span>
+                  </Link>
+                ) : null}
+                <ListingFavoritesNavLink listingId={listing.id} />
+              </div>
             </div>
 
             <article className="grid min-w-0 grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_min(100%,340px)] lg:items-start lg:gap-x-14 lg:gap-y-0 xl:grid-cols-[minmax(0,1fr)_min(100%,360px)] xl:gap-x-16">
@@ -366,7 +390,15 @@ export default async function ListingPage({
                         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary ring-1 ring-primary/18">
                           <MapPin className="size-[18px]" aria-hidden />
                         </span>
-                        <span className="text-sm font-semibold tracking-tight text-foreground">Τοποθεσία</span>
+                        <div>
+                          <span className="text-sm font-semibold tracking-tight text-foreground">Τοποθεσία</span>
+                          {listing.addressLine ? (
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {listing.addressLine}
+                              {listing.addressVisibility === "approximate" ? " (εμφάνιση περίπου)" : ""}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="overflow-hidden rounded-xl border border-border/50 bg-muted/20 shadow-inner dark:border-white/[0.08] dark:bg-muted/15">
                         {mapListing ? <ListingDetailMap listing={mapListing} /> : null}

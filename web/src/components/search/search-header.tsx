@@ -22,17 +22,37 @@ import { FiltersSheetBody } from "./sheet-body";
 import {
   filterLocationSuggestions,
   getLocationSuggestionById,
+  locationSuggestionFromGeocodeLabel,
+  suggestionDedupeKey,
   type LocationSuggestion,
   type SelectedSearchArea,
 } from "./location-suggestions";
 
 const MAX_AREAS = 8;
-const RECENT_STORAGE_KEY = "nestio:recentLocationIds";
+const RECENT_LEGACY_IDS_KEY = "nestio:recentLocationIds";
+const RECENT_SUGGESTIONS_KEY = "nestio:recentLocationSuggestionsV1";
 
-function loadRecentIds(): string[] {
+function isValidStoredSuggestion(x: unknown): x is LocationSuggestion {
+  if (!x || typeof x !== "object") return false;
+  const o = x as Record<string, unknown>;
+  const bb = o.bbox;
+  if (!bb || typeof bb !== "object") return false;
+  const b = bb as Record<string, unknown>;
+  return (
+    typeof o.id === "string" &&
+    typeof o.label === "string" &&
+    typeof o.q === "string" &&
+    typeof b.minLat === "number" &&
+    typeof b.maxLat === "number" &&
+    typeof b.minLng === "number" &&
+    typeof b.maxLng === "number"
+  );
+}
+
+function loadLegacyRecentIds(): string[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(RECENT_STORAGE_KEY);
+    const raw = window.localStorage.getItem(RECENT_LEGACY_IDS_KEY);
     const a = JSON.parse(raw ?? "[]") as unknown;
     if (!Array.isArray(a)) return [];
     return a.filter((x): x is string => typeof x === "string").slice(0, 8);
@@ -41,10 +61,34 @@ function loadRecentIds(): string[] {
   }
 }
 
-function persistRecentIds(ids: string[]) {
+function loadRecentSuggestions(): LocationSuggestion[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(RECENT_SUGGESTIONS_KEY);
+    if (raw) {
+      const a = JSON.parse(raw) as unknown;
+      if (Array.isArray(a)) {
+        const cleaned = a.filter(isValidStoredSuggestion).slice(0, 8);
+        if (cleaned.length > 0) return cleaned;
+      }
+    }
+    const legacyIds = loadLegacyRecentIds();
+    const migrated = legacyIds
+      .map((id) => getLocationSuggestionById(id))
+      .filter((s): s is LocationSuggestion => s != null);
+    if (migrated.length > 0) {
+      persistRecentSuggestions(migrated);
+    }
+    return migrated;
+  } catch {
+    return [];
+  }
+}
+
+function persistRecentSuggestions(items: LocationSuggestion[]) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(ids.slice(0, 8)));
+    window.localStorage.setItem(RECENT_SUGGESTIONS_KEY, JSON.stringify(items.slice(0, 8)));
   } catch {
     /* ignore */
   }
@@ -82,21 +126,83 @@ export function HomeSearchToolbar({
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
-  const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [recentSuggestions, setRecentSuggestions] = useState<LocationSuggestion[]>([]);
+  const [geoSuggestions, setGeoSuggestions] = useState<LocationSuggestion[]>([]);
+  const [geoLoading, setGeoLoading] = useState(false);
 
   useEffect(() => {
-    setRecentIds(loadRecentIds());
+    setRecentSuggestions(loadRecentSuggestions());
   }, []);
 
-  const pushRecentId = useCallback((id: string) => {
-    setRecentIds((prev) => {
-      const next = [id, ...prev.filter((x) => x !== id)].slice(0, 8);
-      persistRecentIds(next);
+  const pushRecentSuggestion = useCallback((s: LocationSuggestion) => {
+    setRecentSuggestions((prev) => {
+      const next = [s, ...prev.filter((x) => x.id !== s.id)].slice(0, 8);
+      persistRecentSuggestions(next);
       return next;
     });
   }, []);
 
-  const suggestions = useMemo(() => filterLocationSuggestions(query, 12), [query]);
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setGeoSuggestions([]);
+      setGeoLoading(false);
+      return;
+    }
+    const ac = new AbortController();
+    const tid = window.setTimeout(() => {
+      setGeoLoading(true);
+      fetch(`/api/geocode/search?q=${encodeURIComponent(q)}`, {
+        signal: ac.signal,
+        cache: "no-store",
+      })
+        .then(async (res) => {
+          if (ac.signal.aborted) return;
+          const json = (await res.json().catch(() => ({}))) as {
+            results?: { label: string; lat: number; lng: number }[];
+          };
+          const rows = Array.isArray(json.results) ? json.results : [];
+          setGeoSuggestions(
+            rows.map((r, i) => locationSuggestionFromGeocodeLabel(r.label, r.lat, r.lng, i))
+          );
+        })
+        .catch(() => {
+          if (ac.signal.aborted) return;
+          setGeoSuggestions([]);
+        })
+        .finally(() => {
+          if (!ac.signal.aborted) setGeoLoading(false);
+        });
+    }, 260);
+    return () => {
+      window.clearTimeout(tid);
+      ac.abort();
+    };
+  }, [query]);
+
+  const staticSuggestions = useMemo(() => filterLocationSuggestions(query, 8), [query]);
+
+  const suggestions = useMemo(() => {
+    const out: LocationSuggestion[] = [];
+    const seen = new Set<string>();
+    const add = (s: LocationSuggestion) => {
+      const k = suggestionDedupeKey(s);
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push(s);
+    };
+    for (const s of staticSuggestions) add(s);
+    for (const s of geoSuggestions) add(s);
+    return out.slice(0, 12);
+  }, [staticSuggestions, geoSuggestions]);
+
+  useEffect(() => {
+    setActiveIdx((prev) => {
+      if (suggestions.length === 0) return -1;
+      if (prev < 0) return -1;
+      return Math.min(prev, suggestions.length - 1);
+    });
+  }, [suggestions]);
 
   useEffect(() => {
     const onDoc = (e: PointerEvent) => {
@@ -121,12 +227,12 @@ export function HomeSearchToolbar({
         return;
       }
       onAddArea(s);
-      pushRecentId(s.id);
+      pushRecentSuggestion(s);
       onQueryChange("");
       setOpen(false);
       setActiveIdx(-1);
     },
-    [onAddArea, onQueryChange, pushRecentId, selectedAreas]
+    [onAddArea, onQueryChange, pushRecentSuggestion, selectedAreas]
   );
 
   const pickSuggestion = useCallback(
@@ -144,16 +250,11 @@ export function HomeSearchToolbar({
     [tryAddArea]
   );
 
-  const recentResolved = useMemo(
-    () =>
-      recentIds
-        .map((id) => ({ id, s: getLocationSuggestionById(id) }))
-        .filter((x): x is { id: string; s: LocationSuggestion } => x.s != null),
-    [recentIds]
-  );
-
   const showFloatingPanel =
-    open && (suggestions.length > 0 || recentResolved.length > 0);
+    open &&
+    (suggestions.length > 0 ||
+      recentSuggestions.length > 0 ||
+      (query.trim().length >= 2 && geoLoading));
 
   return (
     <div>
@@ -248,7 +349,7 @@ export function HomeSearchToolbar({
                         onRemoveArea(selectedAreas[selectedAreas.length - 1]!.id);
                       }
                     }}
-                    placeholder="Πρόσθεσε περιοχές"
+                    placeholder="Περιοχή · π.χ. Θεσσαλονίκη, Μύκονος, Αθήνα…"
                     autoComplete="off"
                     role="combobox"
                     aria-expanded={showFloatingPanel}
@@ -284,6 +385,10 @@ export function HomeSearchToolbar({
                   }}
                 >
                   <div className="max-h-[min(28rem,58dvh)] overflow-y-auto overscroll-contain sm:max-h-[min(26rem,62vh)]">
+                    {geoLoading && suggestions.length === 0 ? (
+                      <div className="px-4 py-4 text-center text-sm text-muted-foreground sm:py-3">Αναζήτηση περιοχών…</div>
+                    ) : null}
+
                     {suggestions.length > 0 ? (
                       <ul id={listId} role="listbox" className="py-2 text-base sm:py-1.5 sm:text-sm">
                         {suggestions.map((s, idx) => (
@@ -309,18 +414,18 @@ export function HomeSearchToolbar({
                       </ul>
                     ) : null}
 
-                    {suggestions.length > 0 && recentResolved.length > 0 ? (
+                    {suggestions.length > 0 && recentSuggestions.length > 0 ? (
                       <div className="border-t border-border/50" aria-hidden />
                     ) : null}
 
-                    {recentResolved.length > 0 ? (
+                    {recentSuggestions.length > 0 ? (
                       <div className="px-2.5 py-2.5 sm:px-2 sm:py-2">
                         <p className="mb-2 px-1 text-[0.8125rem] font-semibold tracking-wide text-muted-foreground sm:mb-1.5 sm:text-xs">
                           Οι τελευταίες αναζητήσεις σου
                         </p>
                         <ul className="space-y-1 sm:space-y-0.5">
-                          {recentResolved.map(({ id, s }) => (
-                            <li key={id}>
+                          {recentSuggestions.map((s) => (
+                            <li key={s.id}>
                               <button
                                 type="button"
                                 className="flex min-h-12 w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left text-base text-foreground active:bg-muted/90 sm:min-h-0 sm:gap-2 sm:rounded-lg sm:py-2 sm:text-sm sm:hover:bg-muted/80"

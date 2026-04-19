@@ -15,6 +15,9 @@ export function listingToJson(r: ListingWithImages) {
     imageSrc: r.coverImageSrc,
     images: r.images.map((i) => i.src),
     dealType: r.dealType === "sale" ? ("sale" as const) : ("rent" as const),
+    addressLine: r.addressLine ?? "",
+    locationPrecision:
+      r.addressVisibility === "exact" ? ("exact" as const) : ("approximate" as const),
     location: { lat: r.lat, lng: r.lng },
   };
 }
