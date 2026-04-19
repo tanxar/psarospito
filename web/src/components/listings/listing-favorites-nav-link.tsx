@@ -32,7 +32,7 @@ export function ListingFavoritesNavLink({
       <Heart
         className={cn(
           "size-5 sm:size-[1.125rem]",
-          isSaved ? "fill-primary text-primary" : "text-muted-foreground"
+          isSaved ? "fill-red-500 text-red-500" : "text-muted-foreground"
         )}
         aria-hidden
       />

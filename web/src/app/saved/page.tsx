@@ -85,7 +85,7 @@ export default function SavedPage() {
 
           <div className="relative z-[1] max-w-xl">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground">
-              <Heart className="size-3.5 text-primary" aria-hidden />
+              <Heart className="size-3.5 text-red-500" aria-hidden />
               Η λίστα σου
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-[2rem] sm:leading-tight">
@@ -126,7 +126,7 @@ export default function SavedPage() {
             <Card className="overflow-hidden rounded-3xl border-border/50 bg-card/85 shadow-sm ring-1 ring-border/25">
               <CardContent className="flex flex-col items-center px-6 py-14 text-center sm:px-10 sm:py-16">
                 <div className="mb-6 flex size-16 items-center justify-center rounded-2xl border border-border/50 bg-muted/40 text-muted-foreground">
-                  <Heart className="size-8 stroke-[1.25]" aria-hidden />
+                  <Heart className="size-8 stroke-[1.25] text-red-400" aria-hidden />
                 </div>
                 <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
                   Δεν έχεις αποθηκεύσει τίποτα ακόμα

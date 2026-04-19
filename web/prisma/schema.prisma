@@ -18,6 +18,12 @@ enum AppointmentStatus {
   CANCELLED
 }
 
+/** Ενοικίαση ολοκληρώθηκε / Πώληση ολοκληρώθηκε — η αγγελία βγαίνει από τα δημόσια αποτελέσματα. */
+enum ListingResolvedOutcome {
+  RENTED
+  SOLD
+}
+
 model User {
   id                          String          @id @default(uuid())
   email                       String          @unique
@@ -27,6 +33,10 @@ model User {
   brokerCompanyName           String?
   brokerPhone                 String?
   brokerOnboardingCompleted  Boolean         @default(false)
+  /** Περιοχές εξυπηρέτησης (π.χ. athens_metro). Κενό = δεν εμφανίζεται στον κατάλογο ανά αγγελία. */
+  brokerServiceRegions        String[]        @default([])
+  /** Όταν ημερομηνία > τώρα, προτεραιότητα στη λίστα (πληρωμένη προώθηση). */
+  brokerPromotionActiveUntil  DateTime?
   createdAt                   DateTime        @default(now())
   updatedAt                   DateTime        @updatedAt
   oauthAccounts               OAuthAccount[]
@@ -63,6 +73,7 @@ model Listing {
   coverImageSrc String
   dealType      String         @default("rent") // "rent" | "sale"
   isActive      Boolean        @default(true)
+  resolvedOutcome ListingResolvedOutcome?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   ownerUserId   String?

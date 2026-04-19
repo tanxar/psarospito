@@ -52,15 +52,6 @@ const HIGHLIGHT_OPTIONS = [
   { value: "Pets ok", label: "Κατοικίδια" },
 ] as const;
 
-const AI_ROOM_TYPE_OPTIONS = [
-  { value: "livingroom", label: "Σαλόνι" },
-  { value: "bedroom", label: "Υπνοδωμάτιο" },
-  { value: "kitchen", label: "Κουζίνα" },
-  { value: "bathroom", label: "Μπάνιο" },
-  { value: "diningroom", label: "Τραπεζαρία" },
-  { value: "office", label: "Γραφείο" },
-] as const;
-
 function formatEur(amount: number) {
   return new Intl.NumberFormat("el-GR", {
     style: "currency",
@@ -221,9 +212,6 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
   const [dragOverPhotoId, setDragOverPhotoId] = useState<string | null>(null);
   const [generateAiRedesigns, setGenerateAiRedesigns] = useState(false);
   const [aiVariantsPerImage, setAiVariantsPerImage] = useState("5");
-  const [aiRoomType, setAiRoomType] = useState<string>("livingroom");
-  const [aiDesignStyle, setAiDesignStyle] = useState("modern");
-  const [aiColorScheme, setAiColorScheme] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editLoadState, setEditLoadState] = useState<"loading" | "ready" | "error">(() =>
@@ -231,7 +219,9 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
   );
 
   const canPostListing =
-    ready && user !== null && user.role === "BROKER" && user.brokerOnboardingCompleted;
+    ready &&
+    user !== null &&
+    (user.role === "SEEKER" || (user.role === "BROKER" && user.brokerOnboardingCompleted));
 
   useEffect(() => {
     if (!listingId) {
@@ -687,7 +677,6 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
     if (generateAiRedesigns) {
       if (parsedUploadedImages.length === 0) return false;
       if (!Number.isFinite(parsedAiVariants) || parsedAiVariants < 1 || parsedAiVariants > 10) return false;
-      if (!aiDesignStyle.trim()) return false;
     }
     return true;
   }, [
@@ -704,7 +693,6 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
     generateAiRedesigns,
     parsedUploadedImages.length,
     parsedAiVariants,
-    aiDesignStyle,
   ]);
 
   async function onSubmit(e: FormEvent) {
@@ -750,9 +738,6 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
             images: parsedUploadedImages,
             generateAiRedesigns,
             aiVariantsPerImage: parsedAiVariants,
-            aiRoomType,
-            aiDesignStyle: aiDesignStyle.trim(),
-            aiColorScheme: aiColorScheme.trim() || undefined,
           }),
         });
 
@@ -793,9 +778,6 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
           images: parsedUploadedImages,
           generateAiRedesigns,
           aiVariantsPerImage: parsedAiVariants,
-          aiRoomType,
-          aiDesignStyle: aiDesignStyle.trim(),
-          aiColorScheme: aiColorScheme.trim() || undefined,
         }),
       });
 
@@ -812,7 +794,8 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
       }
 
       const data = (await res.json()) as { id: string };
-      router.push(`/listing/${data.id}`);
+      const brokerHint = user?.role === "SEEKER" ? "?brokerInvite=1" : "";
+      router.push(`/listing/${data.id}${brokerHint}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Κάτι πήγε στραβά");
     } finally {
@@ -820,37 +803,9 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
     }
   }
 
-  function resetForm() {
-    setTitle("");
-    setSubtitle("");
-    setDescription("");
-    setPriceEur("");
-    setRooms("2");
-    setDealType("rent");
-    setSqm("");
-    setLat("");
-    setLng("");
-    setAddressLine("");
-    scheduleAddressGeocode("");
-    setAddressVisibility("approximate");
-    setAddressSuggestions([]);
-    setAddressSuggestionsOpen(false);
-    setAddressLoading(false);
-    setAddressHighlightedIndex(-1);
-    setSelectedHighlights(new Set());
-    setHighlightsExtra("");
-    setUploadedPhotos([]);
-    setGenerateAiRedesigns(false);
-    setAiVariantsPerImage("5");
-    setAiRoomType("livingroom");
-    setAiDesignStyle("modern");
-    setAiColorScheme("");
-    setError(null);
-  }
-
   if (!ready) {
     return (
-      <div className="relative min-h-screen overflow-x-hidden">
+      <div className="relative min-h-screen">
         <div className="flex min-h-[50vh] items-center justify-center text-sm text-muted-foreground">Φόρτωση…</div>
       </div>
     );
@@ -858,7 +813,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
 
   if (isEdit && editLoadState === "loading") {
     return (
-      <div className="relative min-h-screen overflow-x-hidden">
+      <div className="relative min-h-screen">
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-sm text-muted-foreground">
           <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
           Φόρτωση αγγελίας…
@@ -869,7 +824,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
 
   if (isEdit && editLoadState === "error") {
     return (
-      <div className="relative min-h-screen overflow-x-hidden">
+      <div className="relative min-h-screen">
         <div
           className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_90%_55%_at_50%_-15%,rgba(0,48,135,0.055),transparent)]"
           aria-hidden
@@ -908,7 +863,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
       : "/auth/email?next=%2Flistings%2Fnew";
     const registerBrokerHref = "/register/broker?next=%2Faccount%2Fbroker-onboarding";
     return (
-      <div className="relative min-h-screen overflow-x-hidden">
+      <div className="relative min-h-screen">
         <div
           className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_90%_55%_at_50%_-15%,rgba(0,48,135,0.055),transparent)]"
           aria-hidden
@@ -937,44 +892,29 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
             {!user ? (
               <>
                 <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
-                  Για να δημοσιεύσεις χρειάζεσαι λογαριασμό μεσίτη και σύντομο προφίλ γραφείου.
+                  Συνδέσου για να δημοσιεύσεις ως ιδιώτης ή ως μεσίτης (με συμπληρωμένο προφίλ γραφείου).
                 </p>
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                   <Link href={loginHref} className={cn(buttonVariants({ variant: "default" }), "h-12 justify-center rounded-xl")}>
                     Σύνδεση
                   </Link>
                   <Link
-                    href={registerBrokerHref}
+                    href="/auth/email"
                     className={cn(
                       buttonVariants({ variant: "secondary" }),
+                      "h-12 justify-center rounded-xl border-border/50 bg-background"
+                    )}
+                  >
+                    Εγγραφή
+                  </Link>
+                  <Link
+                    href={registerBrokerHref}
+                    className={cn(
+                      buttonVariants({ variant: "outline" }),
                       "h-12 justify-center rounded-xl border-border/50 bg-background"
                     )}
                   >
                     Εγγραφή ως μεσίτης
-                  </Link>
-                </div>
-              </>
-            ) : user.role === "SEEKER" ? (
-              <>
-                <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
-                  Οι δημοσιεύσεις είναι διαθέσιμες μόνο για επαγγελματίες μεσίτες. Ο λογαριασμός σου είναι ως αναζητητής
-                  ακινήτου.
-                </p>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Για καταχωρήσεις χρειάζεται ξεχωριστός λογαριασμός με ρόλο μεσίτη (άλλο email).
-                </p>
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                  <Link href="/" className={cn(buttonVariants({ variant: "default" }), "h-12 justify-center rounded-xl")}>
-                    Αναζήτηση
-                  </Link>
-                  <Link
-                    href="/account"
-                    className={cn(
-                      buttonVariants({ variant: "secondary" }),
-                      "h-12 justify-center rounded-xl border-border/50 bg-background"
-                    )}
-                  >
-                    Λογαριασμός
                   </Link>
                 </div>
               </>
@@ -1001,7 +941,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden">
+    <div className="relative min-h-screen">
       <div
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_90%_55%_at_50%_-15%,rgba(0,48,135,0.055),transparent)]"
         aria-hidden
@@ -1070,8 +1010,8 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
           </div>
         </div>
 
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-start lg:gap-12">
-          <form onSubmit={onSubmit} className="space-y-8 sm:space-y-10">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-stretch lg:gap-12">
+          <form id="listing-editor-form" onSubmit={onSubmit} className="space-y-8 sm:space-y-10">
             <SectionShell
               step="Βήμα 01"
               icon={Home}
@@ -1375,70 +1315,56 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
                   </div>
                 ) : null}
 
-                <div className="mt-5 flex items-start gap-3 rounded-xl border border-border/45 bg-background/85 px-4 py-3">
-                  <input
-                    id="ai-redesign-toggle"
-                    type="checkbox"
-                    className="mt-0.5 size-4 rounded border-border/60"
-                    checked={generateAiRedesigns}
-                    onChange={(e) => setGenerateAiRedesigns(e.target.checked)}
-                  />
-                  <label htmlFor="ai-redesign-toggle" className="text-sm leading-relaxed text-foreground">
-                    Δημιουργία AI ανακαινισμένων παραλλαγών με Decor8
-                  </label>
+                <div className="mt-5 rounded-xl border border-border/45 bg-gradient-to-b from-primary/[0.04] to-background/85 px-4 py-4 sm:px-5">
+                  <div className="flex gap-3">
+                    <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                    <div className="min-w-0 space-y-1.5">
+                      <p className="text-sm font-medium leading-snug text-foreground">
+                        Παραλλαγές χώρου με τεχνητή νοημοσύνη
+                      </p>
+                      <p className="text-[13px] leading-relaxed text-muted-foreground">
+                        Δημιουργήστε εναλλακτικές εικόνες του ακινήτου σας, ώστε να αναδειχθεί όσο καλύτερα γίνεται και να
+                        τραβήξει το ενδιαφέρον όσων το ψάχνουν.
+                      </p>
+                      <p className="text-xs text-muted-foreground/90">Υλοποίηση μέσω Decor8.</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-start gap-3 border-t border-border/45 pt-4">
+                    <input
+                      id="ai-redesign-toggle"
+                      type="checkbox"
+                      className="mt-0.5 size-4 rounded border-border/60"
+                      checked={generateAiRedesigns}
+                      onChange={(e) => setGenerateAiRedesigns(e.target.checked)}
+                    />
+                    <label htmlFor="ai-redesign-toggle" className="text-sm font-medium leading-relaxed text-foreground">
+                      Να δημιουργηθούν AI παραλλαγές από τις φωτογραφίες μου
+                    </label>
+                  </div>
                 </div>
 
                 {generateAiRedesigns ? (
-                  <div className="mt-5 grid gap-6 rounded-xl border border-primary/20 bg-primary/[0.04] p-4 sm:grid-cols-2">
-                    <Field id="ai-variants" label="Παραλλαγές ανά φωτογραφία (1-10)">
+                  <div className="mt-5 space-y-4 rounded-xl border border-primary/20 bg-primary/[0.04] p-4 sm:p-5">
+                    <Field id="ai-variants" label="Πόσες παραλλαγές ανά φωτογραφία;" hint="Από 1 έως 10. Το στυλ επιλέγεται αυτόματα κάθε φορά για ποικιλία.">
                       <Input
                         id="ai-variants"
-                        className="h-11 rounded-xl border-border/50 bg-background"
+                        className="h-11 max-w-[160px] rounded-xl border-border/50 bg-background"
                         value={aiVariantsPerImage}
                         onChange={(e) => setAiVariantsPerImage(e.target.value)}
                         inputMode="numeric"
                         placeholder="5"
                       />
                     </Field>
-                    <Field id="ai-room-type" label="Τύπος χώρου">
-                      <Select value={aiRoomType} onValueChange={(v) => v != null && setAiRoomType(v)}>
-                        <SelectTrigger id="ai-room-type" className="h-11 w-full rounded-xl border-border/50 bg-background">
-                          <SelectValue placeholder="Επίλεξε χώρο" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {AI_ROOM_TYPE_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field id="ai-style" label="Design style (Decor8)">
-                      <Input
-                        id="ai-style"
-                        className="h-11 rounded-xl border-border/50 bg-background"
-                        value={aiDesignStyle}
-                        onChange={(e) => setAiDesignStyle(e.target.value)}
-                        placeholder="modern"
-                      />
-                    </Field>
-                    <Field id="ai-color-scheme" label="Χρωματική παλέτα (προαιρετικό)">
-                      <Input
-                        id="ai-color-scheme"
-                        className="h-11 rounded-xl border-border/50 bg-background"
-                        value={aiColorScheme}
-                        onChange={(e) => setAiColorScheme(e.target.value)}
-                        placeholder="warm neutrals"
-                      />
-                    </Field>
-
-                    <div className="sm:col-span-2 rounded-lg border border-primary/20 bg-background/80 px-3 py-2 text-sm text-muted-foreground">
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">
+                      Δεν χρειάζεται να διαλέξεις τύπο χώρου ή χρώματα — η υπηρεσία χρησιμοποιεί προεπιλογές ώστε να πατήσεις μόνο ένα νούμερο και να προχωρήσεις.
+                    </p>
+                    <div className="rounded-lg border border-primary/20 bg-background/80 px-3 py-2.5 text-sm text-muted-foreground">
                       <span className="font-medium text-foreground">{parsedUploadedImages.length}</span> φωτογραφίες ×{" "}
                       <span className="font-medium text-foreground">
                         {Number.isFinite(parsedAiVariants) && parsedAiVariants > 0 ? parsedAiVariants : 0}
                       </span>{" "}
-                      παραλλαγές = <span className="font-semibold text-primary">{totalAiOutputs}</span> AI εικόνες
+                      παραλλαγές ≈{" "}
+                      <span className="font-semibold text-primary">{totalAiOutputs}</span> νέες εικόνες στο σύνολο
                     </div>
                   </div>
                 ) : null}
@@ -1622,36 +1548,12 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
                 {error}
               </div>
             ) : null}
-
-            <div className="flex flex-col-reverse gap-4 rounded-2xl border border-border/45 bg-card/70 p-6 shadow-sm ring-1 ring-border/20 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-7">
-              {!isEdit ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="h-12 rounded-xl border-border/50 bg-background"
-                  onClick={resetForm}
-                  disabled={loading}
-                >
-                  Εκκαθάριση φόρμας
-                </Button>
-              ) : (
-                <div className="min-h-12 w-full min-w-0 sm:w-auto sm:flex-1" aria-hidden />
-              )}
-              <Button type="submit" className="h-12 min-w-[220px] rounded-xl px-10" disabled={!canSubmit || loading}>
-                {loading
-                  ? isEdit
-                    ? "Αποθήκευση…"
-                    : "Δημοσίευση…"
-                  : isEdit
-                    ? "Αποθήκευση αλλαγών"
-                    : "Δημοσίευση αγγελίας"}
-              </Button>
-            </div>
           </form>
 
-          {/* Sidebar: preview + checklist */}
-          <aside className="flex flex-col gap-6 lg:sticky lg:top-28">
-            <Card className="overflow-hidden rounded-2xl border-border/50 bg-card/90 shadow-sm ring-1 ring-border/25">
+          {/* Column wrapper: full grid-row height so sticky isn’t clipped (overflow-x on ancestors breaks sticky) */}
+          <div className="flex min-h-0 flex-col lg:h-full lg:min-h-0">
+          <aside className="flex min-h-0 flex-1 flex-col gap-6 overflow-visible">
+            <Card className="shrink-0 overflow-hidden rounded-2xl border-border/50 bg-card/90 shadow-sm ring-1 ring-border/25">
               <div className="border-b border-border/40 bg-muted/15 px-5 py-4">
                 <div className="flex items-center gap-2.5 text-sm font-semibold text-foreground">
                   <PenLine className="size-4 text-primary" aria-hidden />
@@ -1722,29 +1624,47 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
               </div>
             </Card>
 
-            <Card className="rounded-2xl border-border/50 bg-card/85 p-5 shadow-sm ring-1 ring-border/25 sm:p-6">
-              <div className="mb-4 text-sm font-semibold text-foreground">
-                {isEdit ? "Έλεγχος πριν την αποθήκευση" : "Έλεγχος πριν τη δημοσίευση"}
-              </div>
-              <div className="space-y-2">
-                <CheckRow done={hasTitle} label="Τίτλος συμπληρωμένος" />
-                <CheckRow done={hasPrice} label="Έγκυρη τιμή" />
-                <CheckRow done={hasSqm} label="Εμβαδόν (m²)" />
-                <CheckRow done={true} label="Δωμάτια επιλεγμένα" />
-                <CheckRow done={hasHighlights} label="Τουλάχιστον ένα χαρακτηριστικό (προτείνεται)" />
-              </div>
-            </Card>
+            <div className="flex w-full flex-col gap-6 lg:sticky lg:top-24 lg:z-10 lg:self-start">
+              <Card className="rounded-2xl border-border/50 bg-card/85 p-5 shadow-md ring-1 ring-border/30 sm:p-6">
+                <div className="mb-4 text-sm font-semibold text-foreground">
+                  {isEdit ? "Έλεγχος πριν την αποθήκευση" : "Έλεγχος πριν τη δημοσίευση"}
+                </div>
+                <div className="space-y-2">
+                  <CheckRow done={hasTitle} label="Τίτλος συμπληρωμένος" />
+                  <CheckRow done={hasPrice} label="Έγκυρη τιμή" />
+                  <CheckRow done={hasSqm} label="Εμβαδόν (m²)" />
+                  <CheckRow done={true} label="Δωμάτια επιλεγμένα" />
+                  <CheckRow done={hasHighlights} label="Τουλάχιστον ένα χαρακτηριστικό (προτείνεται)" />
+                </div>
+              </Card>
 
-            <div className="flex gap-4 rounded-2xl border border-primary/12 bg-primary/[0.035] p-5 text-[15px] leading-relaxed text-foreground sm:p-6">
-              <Lightbulb className="mt-0.5 size-5 shrink-0 text-primary/90" aria-hidden />
-              <div>
-                <p className="font-semibold text-foreground">Συμβουλή</p>
-                <p className="mt-2 text-muted-foreground">
-                  Καλοί τίτλοι αναφέρουν περιοχή και τύπο ακινήτου. Στο υπότιτλο βάλε όροφο, κατάσταση ή απόσταση από μετρό.
-                </p>
+              <div className="flex gap-4 rounded-2xl border border-primary/20 bg-primary/[0.045] p-5 text-[15px] leading-relaxed text-foreground shadow-md ring-1 ring-primary/10 sm:p-6">
+                <Lightbulb className="mt-0.5 size-5 shrink-0 text-primary/90" aria-hidden />
+                <div>
+                  <p className="font-semibold text-foreground">Συμβουλή</p>
+                  <p className="mt-2 text-muted-foreground">
+                    Καλοί τίτλοι αναφέρουν περιοχή και τύπο ακινήτου. Στο υπότιτλο βάλε όροφο, κατάσταση ή απόσταση από μετρό.
+                  </p>
+                </div>
               </div>
+
+              <Button
+                form="listing-editor-form"
+                type="submit"
+                className="h-12 w-full rounded-xl px-6"
+                disabled={!canSubmit || loading}
+              >
+                {loading
+                  ? isEdit
+                    ? "Αποθήκευση…"
+                    : "Δημοσίευση…"
+                  : isEdit
+                    ? "Αποθήκευση αλλαγών"
+                    : "Δημοσίευση αγγελίας"}
+              </Button>
             </div>
           </aside>
+          </div>
         </div>
       </div>
     </div>

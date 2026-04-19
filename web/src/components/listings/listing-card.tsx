@@ -95,7 +95,25 @@ export function ListingCard({
             >
               {(listing.dealType ?? "rent") === "sale" ? "Πώληση" : "Ενοικίαση"}
             </div>
-            {listing.isActive === false ? (
+            {listing.resolvedOutcome === "RENTED" ? (
+              <div
+                className={cn(
+                  "rounded-full border border-emerald-400/45 bg-emerald-950/75 font-semibold text-emerald-50 shadow-sm backdrop-blur-md",
+                  compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]"
+                )}
+              >
+                Ενοικιάστηκε
+              </div>
+            ) : listing.resolvedOutcome === "SOLD" ? (
+              <div
+                className={cn(
+                  "rounded-full border border-violet-400/45 bg-violet-950/75 font-semibold text-violet-50 shadow-sm backdrop-blur-md",
+                  compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]"
+                )}
+              >
+                Πουλήθηκε
+              </div>
+            ) : listing.isActive === false ? (
               <div
                 className={cn(
                   "rounded-full border border-amber-400/40 bg-amber-950/65 font-semibold text-amber-50 shadow-sm backdrop-blur-md",
@@ -128,7 +146,7 @@ export function ListingCard({
             <Heart
               className={cn(
                 compact ? "size-3.5" : "size-4",
-                saved ? "fill-primary text-primary" : "text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+                saved ? "fill-red-500 text-red-500" : "text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
               )}
             />
           </button>

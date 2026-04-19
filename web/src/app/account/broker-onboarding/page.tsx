@@ -10,15 +10,39 @@ import { notifyAuthChanged, useSessionUser } from "@/components/auth/use-session
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  SERVICE_REGION_LABELS,
+  type ServiceRegionId,
+} from "@/lib/greek-service-regions";
 import { cn } from "@/lib/utils";
+
+const REGION_ORDER: ServiceRegionId[] = [
+  "athens_metro",
+  "thessaloniki_metro",
+  "patras",
+  "larissa",
+  "heraklion",
+  "greece_other",
+  "greece_wide",
+];
 
 export default function BrokerOnboardingPage() {
   const router = useRouter();
   const { user, ready } = useSessionUser();
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
+  const [serviceRegions, setServiceRegions] = useState<Set<ServiceRegionId>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  function toggleRegion(id: ServiceRegionId) {
+    setServiceRegions((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!ready) return;
@@ -39,6 +63,10 @@ export default function BrokerOnboardingPage() {
     e.preventDefault();
     if (loading) return;
     setError(null);
+    if (serviceRegions.size === 0) {
+      setError("Διάλεξε τουλάχιστον μία περιοχή εξυπηρέτησης.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/me", {
@@ -47,6 +75,7 @@ export default function BrokerOnboardingPage() {
         body: JSON.stringify({
           brokerCompanyName: company.trim(),
           brokerPhone: phone.trim(),
+          brokerServiceRegions: Array.from(serviceRegions),
         }),
       });
       const raw = await res.text();
@@ -156,6 +185,34 @@ export default function BrokerOnboardingPage() {
                   autoComplete="tel"
                 />
                 <p className="text-xs text-muted-foreground">Τουλάχιστον 10 ψηφία (κενά και σύμβολα αγνοούνται).</p>
+              </div>
+
+              <div className="space-y-3">
+                <span className="text-sm font-medium text-foreground">Περιοχές εξυπηρέτησης</span>
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  Οι ιδιώτες βλέπουν μόνο μεσίτες που καλύπτουν την περιοχή της αγγελίας. «Όλη η Ελλάδα» για γραφεία με πανελλαδική παρουσία.
+                </p>
+                <div className="grid gap-2.5">
+                  {REGION_ORDER.map((id) => (
+                    <label
+                      key={id}
+                      className={cn(
+                        "flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition-colors",
+                        serviceRegions.has(id)
+                          ? "border-primary/45 bg-primary/[0.06] ring-1 ring-primary/15"
+                          : "border-border/50 bg-background/80 hover:border-border"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-1 size-4 shrink-0 rounded border-border text-primary"
+                        checked={serviceRegions.has(id)}
+                        onChange={() => toggleRegion(id)}
+                      />
+                      <span className="text-[13px] leading-snug text-foreground">{SERVICE_REGION_LABELS[id]}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               <Button type="submit" className="h-12 w-full rounded-xl" disabled={loading}>

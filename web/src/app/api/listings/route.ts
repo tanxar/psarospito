@@ -13,6 +13,7 @@ import {
   parseListingGeoBBoxes,
   parseListingPostFilters,
 } from "@/lib/listings-query";
+import { allocateUniqueListingId } from "@/lib/listing-id";
 
 export const dynamic = "force-dynamic";
 const MAX_LISTING_IMAGES = 300;
@@ -96,11 +97,11 @@ export async function POST(req: Request) {
     if (!session) {
       return jsonError("Συνδέσου για να δημιουργήσεις αγγελία", 401);
     }
-    if (session.role !== "BROKER") {
-      return jsonError("Η δημοσίευση αγγελιών είναι διαθέσιμη μόνο για μεσίτες", 403);
-    }
-    if (!session.brokerOnboardingCompleted) {
+    if (session.role === "BROKER" && !session.brokerOnboardingCompleted) {
       return jsonError("Ολοκλήρωσε πρώτα το προφίλ μεσίτη", 403);
+    }
+    if (session.role !== "BROKER" && session.role !== "SEEKER") {
+      return jsonError("Η δημοσίευση αγγελιών δεν είναι διαθέσιμη για αυτόν τον λογαριασμό", 403);
     }
 
     const body = (await req.json().catch(() => null)) as
@@ -121,9 +122,6 @@ export async function POST(req: Request) {
           sourceImages?: unknown;
           generateAiRedesigns?: unknown;
           aiVariantsPerImage?: unknown;
-          aiRoomType?: unknown;
-          aiDesignStyle?: unknown;
-          aiColorScheme?: unknown;
           addressLine?: unknown;
           addressVisibility?: unknown;
         };
@@ -169,11 +167,6 @@ export async function POST(req: Request) {
     const uploadedImages = sourceImages.length > 0 ? sourceImages : fallbackImages;
     const generateAiRedesigns = body.generateAiRedesigns === true;
     const aiVariantsPerImage = Number(body.aiVariantsPerImage);
-    const aiRoomType = typeof body.aiRoomType === "string" && body.aiRoomType.trim() ? body.aiRoomType.trim() : "livingroom";
-    const aiDesignStyle =
-      typeof body.aiDesignStyle === "string" && body.aiDesignStyle.trim() ? body.aiDesignStyle.trim() : "modern";
-    const aiColorScheme =
-      typeof body.aiColorScheme === "string" && body.aiColorScheme.trim() ? body.aiColorScheme.trim() : undefined;
 
     if (generateAiRedesigns && uploadedImages.length === 0) {
       return jsonError("Για AI παραλλαγές χρειάζεσαι τουλάχιστον 1 φωτογραφία", 400);
@@ -191,9 +184,6 @@ export async function POST(req: Request) {
         generatedImages = await generateDecor8Designs({
           inputImageUrls: uploadedImages,
           variantsPerImage: Math.floor(aiVariantsPerImage),
-          roomType: aiRoomType,
-          designStyle: aiDesignStyle,
-          colorScheme: aiColorScheme,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Decor8 failed";
@@ -204,7 +194,7 @@ export async function POST(req: Request) {
     const allListingImages = [...new Set([...uploadedImages, ...generatedImages])].slice(0, MAX_LISTING_IMAGES);
     const imageRows = allListingImages.map((src, index) => ({ src, sortOrder: index }));
 
-    const id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
+    const id = await allocateUniqueListingId(prisma);
 
     const created = await prisma.listing.create({
       data: {

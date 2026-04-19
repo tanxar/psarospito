@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { ListingsNewEntryLink } from "@/components/layout/listings-new-entry-link";
 
 const accountMenuItemClass =
   "flex w-full cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 text-[13px] outline-none transition-[background,color] duration-150 data-highlighted:bg-primary/[0.09] data-highlighted:text-foreground";
@@ -70,7 +71,7 @@ export function SiteHeader() {
                     return (
                       <span
                         key={i}
-                        className="animate-saved-spark-fly absolute left-1/2 top-1/2 size-1 rounded-full bg-primary shadow-[0_0_5px_var(--color-primary)] dark:shadow-[0_0_6px_rgba(122,162,255,0.85)]"
+                        className="animate-saved-spark-fly absolute left-1/2 top-1/2 size-1 rounded-full bg-red-500 shadow-[0_0_5px_rgb(239_68_68)] dark:shadow-[0_0_6px_rgba(248_113_113_/_0.9)]"
                         style={
                           {
                             "--spark-x": `${x}px`,
@@ -89,7 +90,7 @@ export function SiteHeader() {
                 <Heart
                   className={cn(
                     "size-4 shrink-0",
-                    savedCount > 0 ? "fill-primary text-primary" : "text-muted-foreground"
+                    savedCount > 0 ? "fill-red-500 text-red-500" : "text-muted-foreground"
                   )}
                   aria-hidden
                 />
@@ -141,7 +142,7 @@ export function SiteHeader() {
                     <span className="min-w-0 flex-1 font-medium">Λογαριασμός</span>
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground/45" aria-hidden />
                   </DropdownMenuItem>
-                  {user.role === "BROKER" ? (
+                  {user.role === "BROKER" || user.role === "SEEKER" ? (
                     <DropdownMenuItem className={accountMenuItemClass} onClick={() => router.push("/listings/mine")}>
                       <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/70 text-muted-foreground">
                         <LayoutList className="size-4" aria-hidden />
@@ -184,8 +185,7 @@ export function SiteHeader() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Link
-            href="/listings/new"
+          <ListingsNewEntryLink
             aria-label="Προσθήκη αγγελίας"
             title="Προσθήκη αγγελίας"
             className={cn(
@@ -195,9 +195,8 @@ export function SiteHeader() {
             )}
           >
             <Plus className="size-[1.15rem]" strokeWidth={2.75} aria-hidden />
-          </Link>
-          <Link
-            href="/listings/new"
+          </ListingsNewEntryLink>
+          <ListingsNewEntryLink
             className={cn(
               buttonVariants({ variant: "default", size: "sm" }),
               "h-9 rounded-lg px-3",
@@ -206,7 +205,7 @@ export function SiteHeader() {
           >
             <Plus className="size-4" />
             Καταχώρηση
-          </Link>
+          </ListingsNewEntryLink>
         </div>
       </div>
     </header>

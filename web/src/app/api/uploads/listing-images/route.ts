@@ -16,8 +16,12 @@ export async function POST(req: Request) {
   try {
     const session = await getSessionUserFromRequest();
     if (!session) return jsonError("Συνδέσου για upload φωτογραφιών", 401);
-    if (session.role !== "BROKER") return jsonError("Μόνο μεσίτες μπορούν να ανεβάσουν φωτογραφίες", 403);
-    if (!session.brokerOnboardingCompleted) return jsonError("Ολοκλήρωσε πρώτα το προφίλ μεσίτη", 403);
+    if (session.role === "BROKER" && !session.brokerOnboardingCompleted) {
+      return jsonError("Ολοκλήρωσε πρώτα το προφίλ μεσίτη", 403);
+    }
+    if (session.role !== "SEEKER" && session.role !== "BROKER") {
+      return jsonError("Δεν επιτρέπεται μεταφόρτωση για αυτόν τον λογαριασμό", 403);
+    }
     if (!isCloudinaryConfigured()) return jsonError("Λείπει το Cloudinary configuration στο περιβάλλον", 500);
 
     const form = await req.formData();

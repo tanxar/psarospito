@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { ListingsNewEntryLink } from "@/components/layout/listings-new-entry-link";
+
 const linkClass =
   "text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground";
 
@@ -43,9 +45,9 @@ export function SiteFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/listings/new" className={linkClass}>
+                <ListingsNewEntryLink className={linkClass}>
                   Νέα αγγελία
-                </Link>
+                </ListingsNewEntryLink>
               </li>
             </ul>
           </div>

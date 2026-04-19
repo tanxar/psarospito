@@ -39,16 +39,43 @@ export default function MyListingsPage() {
   const [retryToken, setRetryToken] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const isBroker = user?.role === "BROKER";
+  const buckets = useMemo(() => {
+    const active: Listing[] = [];
+    const rented: Listing[] = [];
+    const sold: Listing[] = [];
+    const otherInactive: Listing[] = [];
+    for (const l of listings) {
+      if (l.resolvedOutcome === "RENTED") rented.push(l);
+      else if (l.resolvedOutcome === "SOLD") sold.push(l);
+      else if (l.isActive === false) otherInactive.push(l);
+      else active.push(l);
+    }
+    return { active, rented, sold, otherInactive };
+  }, [listings]);
 
-  const filteredListings = useMemo(
-    () => listings.filter((l) => listingMatchesSearch(l, searchQuery)),
-    [listings, searchQuery]
+  const activeFiltered = useMemo(
+    () => buckets.active.filter((l) => listingMatchesSearch(l, searchQuery)),
+    [buckets.active, searchQuery]
   );
+  const rentedFiltered = useMemo(
+    () => buckets.rented.filter((l) => listingMatchesSearch(l, searchQuery)),
+    [buckets.rented, searchQuery]
+  );
+  const soldFiltered = useMemo(
+    () => buckets.sold.filter((l) => listingMatchesSearch(l, searchQuery)),
+    [buckets.sold, searchQuery]
+  );
+  const otherInactiveFiltered = useMemo(
+    () => buckets.otherInactive.filter((l) => listingMatchesSearch(l, searchQuery)),
+    [buckets.otherInactive, searchQuery]
+  );
+
+  const totalFiltered =
+    activeFiltered.length + rentedFiltered.length + soldFiltered.length + otherInactiveFiltered.length;
 
   useEffect(() => {
     if (!ready) return;
-    if (!user || !isBroker) {
+    if (!user) {
       setMineListReady(true);
       return;
     }
@@ -86,11 +113,10 @@ export default function MyListingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [ready, user, isBroker, retryToken]);
+  }, [ready, user, retryToken]);
 
   const count = listings.length;
   const searchTrimmed = searchQuery.trim();
-  const filteredCount = filteredListings.length;
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
@@ -121,13 +147,13 @@ export default function MyListingsPage() {
           <div className="relative z-[1] max-w-xl">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground">
               <LayoutList className="size-3.5 text-primary" aria-hidden />
-              Επαγγελματίας
+              Οι καταχωρήσεις σου
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-[2rem] sm:leading-tight">
               Οι αγγελίες μου
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-[15px]">
-              Όλες οι καταχωρήσεις που έχεις δημοσιεύσει — ενεργές και ανενεργές. Για επεξεργασία, άνοιξε πρώτα την αγγελία και μετά πάτα «Επεξεργασία» στην προβολή της.
+              Ενεργές καταχωρήσεις, ολοκληρωμένες συναλλαγές (ενοικίαση / πώληση) και άλλες ανενεργές — ως ιδιώτης ή μεσίτης. Στη σελίδα της αγγελίας μπορείς να επισημάνεις «Ενοικιάστηκε» ή «Πουλήθηκε» ώστε να βγει από τα δημόσια αποτελέσματα.
             </p>
           </div>
         </div>
@@ -147,23 +173,6 @@ export default function MyListingsPage() {
                 className={cn(buttonVariants({ variant: "default" }), "mt-8 inline-flex h-12 items-center rounded-xl px-8")}
               >
                 Σύνδεση
-              </Link>
-            </CardContent>
-          </Card>
-        ) : !isBroker ? (
-          <Card className="overflow-hidden rounded-3xl border-border/50 bg-card/85 shadow-sm ring-1 ring-border/25">
-            <CardContent className="flex flex-col items-center px-6 py-14 text-center sm:px-10 sm:py-16">
-              <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-                Διαθέσιμο για επαγγελματίες
-              </h2>
-              <p className="mt-3 max-w-md text-[15px] leading-relaxed text-muted-foreground">
-                Οι αγγελίες σου εμφανίζονται εδώ όταν έχεις λογαριασμό μεσίτη και δημοσιεύεις ακίνητα.
-              </p>
-              <Link
-                href="/register/broker"
-                className={cn(buttonVariants({ variant: "default" }), "mt-8 inline-flex h-12 items-center rounded-xl px-8")}
-              >
-                Εγγραφή επαγγελματία
               </Link>
             </CardContent>
           </Card>
@@ -253,9 +262,10 @@ export default function MyListingsPage() {
               <p className="shrink-0 text-sm tabular-nums text-muted-foreground sm:text-right">
                 {searchTrimmed ? (
                   <>
-                    <span className="font-medium text-foreground">{filteredCount}</span>
+                    <span className="font-medium text-foreground">{totalFiltered}</span>
                     <span> από </span>
                     <span className="font-medium text-foreground">{count}</span>
+                    <span> ταιριάζουν</span>
                   </>
                 ) : (
                   <>
@@ -266,7 +276,7 @@ export default function MyListingsPage() {
               </p>
             </div>
 
-            {filteredCount === 0 && searchTrimmed ? (
+            {totalFiltered === 0 && searchTrimmed ? (
               <Card className="overflow-hidden rounded-3xl border-border/50 bg-card/85 shadow-sm ring-1 ring-border/25">
                 <CardContent className="flex flex-col items-center px-6 py-12 text-center sm:px-10 sm:py-14">
                   <div className="mb-4 flex size-14 items-center justify-center rounded-2xl border border-border/50 bg-muted/40 text-muted-foreground">
@@ -289,18 +299,99 @@ export default function MyListingsPage() {
                 </CardContent>
               </Card>
             ) : (
-              <ul className="grid list-none grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:gap-4 2xl:grid-cols-4">
-                {filteredListings.map((l) => (
-                  <li key={l.id} className="min-w-0">
-                    <ListingCard
-                      compact
-                      listing={l}
-                      saved={saved.has(l.id)}
-                      onToggleSaved={saved.toggle}
-                    />
-                  </li>
-                ))}
-              </ul>
+              <div className="space-y-10 sm:space-y-12">
+                {activeFiltered.length > 0 ? (
+                  <section className="space-y-4">
+                    <div>
+                      <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">Ενεργές αγγελίες</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">Εμφανίζονται στην αναζήτηση και στον χάρτη.</p>
+                    </div>
+                    <ul className="grid list-none grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:gap-4 2xl:grid-cols-4">
+                      {activeFiltered.map((l) => (
+                        <li key={l.id} className="min-w-0">
+                          <ListingCard
+                            compact
+                            listing={l}
+                            saved={saved.has(l.id)}
+                            onToggleSaved={saved.toggle}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+
+                {rentedFiltered.length > 0 ? (
+                  <section className="space-y-4">
+                    <div>
+                      <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+                        Ακίνητα που ενοικιάστηκαν
+                      </h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Επισημάνθηκαν από εσένα ως ολοκληρωμένη ενοικίαση — δεν εμφανίζονται πλέον δημόσια.
+                      </p>
+                    </div>
+                    <ul className="grid list-none grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:gap-4 2xl:grid-cols-4">
+                      {rentedFiltered.map((l) => (
+                        <li key={l.id} className="min-w-0">
+                          <ListingCard
+                            compact
+                            listing={l}
+                            saved={saved.has(l.id)}
+                            onToggleSaved={saved.toggle}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+
+                {soldFiltered.length > 0 ? (
+                  <section className="space-y-4">
+                    <div>
+                      <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">Ακίνητα που πουλήθηκαν</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Επισημάνθηκαν ως πωλημένα — εκτός δημόσιας λίστας, μόνο εδώ στο προφίλ σου.
+                      </p>
+                    </div>
+                    <ul className="grid list-none grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:gap-4 2xl:grid-cols-4">
+                      {soldFiltered.map((l) => (
+                        <li key={l.id} className="min-w-0">
+                          <ListingCard
+                            compact
+                            listing={l}
+                            saved={saved.has(l.id)}
+                            onToggleSaved={saved.toggle}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+
+                {otherInactiveFiltered.length > 0 ? (
+                  <section className="space-y-4">
+                    <div>
+                      <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">Άλλες ανενεργές</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Ανενεργές χωρίς επισημάνσεις πώλησης ή ενοικίασης (π.χ. παλιές καταχωρήσεις).
+                      </p>
+                    </div>
+                    <ul className="grid list-none grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:gap-4 2xl:grid-cols-4">
+                      {otherInactiveFiltered.map((l) => (
+                        <li key={l.id} className="min-w-0">
+                          <ListingCard
+                            compact
+                            listing={l}
+                            saved={saved.has(l.id)}
+                            onToggleSaved={saved.toggle}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+              </div>
             )}
           </div>
         )}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { ArrowLeft, Building2, FileText, MapPin, PenLine, Sparkles } from "lucide-react";
 
 import { prisma } from "@/db/prisma";
@@ -10,6 +11,8 @@ import { ListingSpecTable, type ListingSpecRow } from "@/components/listings/lis
 import { ListingDetailMap } from "@/components/map/listing-detail-map";
 import { ListingGallery } from "@/components/listings/listing-gallery";
 import type { Listing } from "@/components/listings/types";
+import { ListingBrokerInviteBanner } from "@/components/listings/listing-broker-invite-banner";
+import { ListingOwnerResolvePanel } from "@/components/listings/listing-owner-resolve-panel";
 import { ListingViewingBooking } from "@/components/listings/listing-viewing-booking";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -61,6 +64,7 @@ async function resolveListingDescription(
 
 function BrokerProfileInner({
   owner,
+  completedListingsCount,
 }: {
   owner: {
     name: string;
@@ -68,16 +72,22 @@ function BrokerProfileInner({
     brokerCompanyName: string | null;
     brokerPhone: string | null;
   };
+  /** Αγγελίες με «ενοικιάστηκε» / «πουλήθηκε» — υπολογίζεται από τη βάση */
+  completedListingsCount?: number;
 }) {
   const initial = owner.name.trim().charAt(0).toUpperCase() || "?";
   const isBroker = owner.role === "BROKER";
+  const roleLabel = isBroker ? "Μεσίτης" : "Ιδιώτης";
+
+  const completedLabel =
+    completedListingsCount === 1
+      ? "1 ολοκληρωμένη αγγελία"
+      : `${completedListingsCount} ολοκληρωμένες αγγελίες`;
 
   return (
     <>
       <div className="flex items-center">
-        <span className="text-sm font-semibold tracking-tight text-foreground">
-          {isBroker ? "Μεσίτης" : "Υπεύθυνος"}
-        </span>
+        <span className="text-sm font-semibold tracking-tight text-foreground">{roleLabel}</span>
       </div>
       <div className="mt-5 flex gap-4 sm:mt-6 sm:gap-5">
         <div
@@ -96,6 +106,9 @@ function BrokerProfileInner({
               <span>{owner.brokerCompanyName}</span>
             </p>
           ) : null}
+          {isBroker && completedListingsCount != null && completedListingsCount > 0 ? (
+            <p className="text-[13px] leading-snug text-muted-foreground">{completedLabel}</p>
+          ) : null}
           {!owner.brokerPhone ? (
             <p className="text-xs text-muted-foreground">Δεν έχει δηλωθεί τηλέφωνο.</p>
           ) : null}
@@ -112,12 +125,17 @@ function ListingPreviewBlock({ gallery, title }: { gallery: string[]; title: str
 
 export default async function ListingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
+  const sp = (await searchParams) ?? {};
+  const bi = sp.brokerInvite;
+  const brokerInviteOn = bi === "1" || (Array.isArray(bi) && bi[0] === "1");
   const session = await getSessionUserFromRequest();
-  const listing = await prisma.listing.findUnique({
+  const row = await prisma.listing.findUnique({
     where: { id },
     include: {
       images: { orderBy: { sortOrder: "asc" } },
@@ -133,7 +151,24 @@ export default async function ListingPage({
     },
   });
 
+  /** Ανενεργές αγγελίες (π.χ. μετά από πώληση/ενοικίαση): μόνο ο ιδιοκτήτης τις βλέπει δημόσια σελίδα. */
+  let listing = row;
+  if (row && !row.isActive) {
+    const isOwner = session != null && row.ownerUserId != null && session.id === row.ownerUserId;
+    listing = isOwner ? row : null;
+  }
+
   const descriptionText = listing ? await resolveListingDescription(listing.id, listing) : "";
+
+  let brokerCompletedListingsCount: number | undefined;
+  if (listing?.ownerUserId) {
+    brokerCompletedListingsCount = await prisma.listing.count({
+      where: {
+        ownerUserId: listing.ownerUserId,
+        resolvedOutcome: { not: null },
+      },
+    });
+  }
 
   const highlights = listing && Array.isArray(listing.highlights) ? (listing.highlights as string[]) : [];
   const gallery = listing ? [listing.coverImageSrc, ...listing.images.map((i) => i.src)].filter(Boolean) : [];
@@ -204,11 +239,12 @@ export default async function ListingPage({
     ];
   }
 
-  const showOwnerEdit =
-    !!listing &&
-    session?.role === "BROKER" &&
-    !!listing.ownerUserId &&
-    session.id === listing.ownerUserId;
+  const showOwnerEdit = !!listing && !!listing.ownerUserId && session?.id === listing.ownerUserId;
+
+  const showBrokerCoopBanner =
+    brokerInviteOn &&
+    showOwnerEdit &&
+    listing?.owner?.role === "SEEKER";
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
@@ -256,6 +292,12 @@ export default async function ListingPage({
               </div>
             </div>
 
+            {showBrokerCoopBanner ? (
+              <Suspense fallback={null}>
+                <ListingBrokerInviteBanner listingId={listing.id} />
+              </Suspense>
+            ) : null}
+
             <article className="grid min-w-0 grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_min(100%,340px)] lg:items-start lg:gap-x-14 lg:gap-y-0 xl:grid-cols-[minmax(0,1fr)_min(100%,360px)] xl:gap-x-16">
               <div className="flex min-w-0 flex-col gap-8 sm:gap-10">
                 <div className="relative">
@@ -284,6 +326,17 @@ export default async function ListingPage({
                   <p className="mt-3 max-w-prose text-pretty text-base leading-relaxed text-muted-foreground sm:text-[1.05rem] sm:leading-[1.7]">
                     {listing.subtitle}
                   </p>
+
+                  {showOwnerEdit ? (
+                    <div className="mt-6 max-w-2xl">
+                      <ListingOwnerResolvePanel
+                        listingId={listing.id}
+                        dealType={listing.dealType === "sale" ? "sale" : "rent"}
+                        isActive={listing.isActive}
+                        resolvedOutcome={listing.resolvedOutcome}
+                      />
+                    </div>
+                  ) : null}
 
                   <dl className="mt-6 grid gap-3 sm:mt-8 sm:grid-cols-3 sm:gap-4">
                     <div className="rounded-xl border border-border/45 bg-background/70 px-4 py-3.5 shadow-sm dark:bg-background/25">
@@ -359,7 +412,10 @@ export default async function ListingPage({
                         aria-hidden
                       />
                       {listing.owner ? (
-                        <BrokerProfileInner owner={listing.owner} />
+                        <BrokerProfileInner
+                          owner={listing.owner}
+                          completedListingsCount={brokerCompletedListingsCount}
+                        />
                       ) : (
                         <>
                           <div className="flex items-center">

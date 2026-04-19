@@ -42,7 +42,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const isOwner = session?.role === "BROKER" && session.id === row.ownerUserId;
+    const isOwner = session != null && session.id === row.ownerUserId;
     if (!row.isActive && !isOwner) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -60,10 +60,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (!session) {
       return jsonError("Συνδέσου για να επεξεργαστείς αγγελία", 401);
     }
-    if (session.role !== "BROKER") {
-      return jsonError("Η επεξεργασία αγγελιών είναι διαθέσιμη μόνο για μεσίτες", 403);
-    }
-
     const { id } = await ctx.params;
     if (!id) {
       return jsonError("Missing id", 400);
@@ -102,9 +98,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           sourceImages?: unknown;
           generateAiRedesigns?: unknown;
           aiVariantsPerImage?: unknown;
-          aiRoomType?: unknown;
-          aiDesignStyle?: unknown;
-          aiColorScheme?: unknown;
           addressLine?: unknown;
           addressVisibility?: unknown;
         };
@@ -191,11 +184,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
     const generateAiRedesigns = body.generateAiRedesigns === true;
     const aiVariantsPerImage = Number(body.aiVariantsPerImage);
-    const aiRoomType = typeof body.aiRoomType === "string" && body.aiRoomType.trim() ? body.aiRoomType.trim() : "livingroom";
-    const aiDesignStyle =
-      typeof body.aiDesignStyle === "string" && body.aiDesignStyle.trim() ? body.aiDesignStyle.trim() : "modern";
-    const aiColorScheme =
-      typeof body.aiColorScheme === "string" && body.aiColorScheme.trim() ? body.aiColorScheme.trim() : undefined;
 
     if (generateAiRedesigns && uploadedImages.length === 0) {
       return jsonError("Για AI παραλλαγές χρειάζεσαι τουλάχιστον 1 φωτογραφία", 400);
@@ -213,9 +201,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         generatedImages = await generateDecor8Designs({
           inputImageUrls: uploadedImages,
           variantsPerImage: Math.floor(aiVariantsPerImage),
-          roomType: aiRoomType,
-          designStyle: aiDesignStyle,
-          colorScheme: aiColorScheme,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Decor8 failed";

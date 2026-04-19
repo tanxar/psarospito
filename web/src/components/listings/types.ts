@@ -14,6 +14,8 @@ export type Listing = {
   dealType?: "rent" | "sale";
   /** Προαιρετικό — π.χ. στη σελίδα «Οι αγγελίες μου» */
   isActive?: boolean;
+  /** Ολοκληρωμένη συναλλαγή — φαίνεται μόνο στον ιδιοκτήτη */
+  resolvedOutcome?: "RENTED" | "SOLD" | null;
   addressLine?: string;
   locationPrecision?: "exact" | "approximate";
   location: {

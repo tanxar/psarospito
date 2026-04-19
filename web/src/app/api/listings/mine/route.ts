@@ -12,13 +12,6 @@ export async function GET() {
     if (!session) {
       return NextResponse.json({ error: "Συνδέσου για να δεις τις αγγελίες σου" }, { status: 401 });
     }
-    if (session.role !== "BROKER") {
-      return NextResponse.json(
-        { error: "Οι αγγελίες σου είναι διαθέσιμες για λογαριασμούς επαγγελματιών" },
-        { status: 403 }
-      );
-    }
-
     const rows = await prisma.listing.findMany({
       where: { ownerUserId: session.id },
       orderBy: { updatedAt: "desc" },
@@ -29,6 +22,7 @@ export async function GET() {
       rows.map((r) => ({
         ...listingToJson(r),
         isActive: r.isActive,
+        resolvedOutcome: r.resolvedOutcome,
       }))
     );
   } catch (e) {

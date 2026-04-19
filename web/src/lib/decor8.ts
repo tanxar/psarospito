@@ -1,6 +1,23 @@
 const DECOR8_ENDPOINT = "https://api.decor8.ai/generate_designs_for_room";
 const DECOR8_MAX_IMAGES_PER_REQUEST = 4;
 
+/** Generic interior — avoids asking the user for room type; works reasonably across listing photos. */
+const DECOR8_DEFAULT_ROOM_TYPE = "livingroom";
+
+/** Rotated per source image so batches feel varied without user tuning. */
+const DECOR8_DESIGN_STYLES = [
+  "modern",
+  "scandinavian",
+  "minimalist",
+  "mediterranean",
+  "contemporary",
+  "coastal",
+  "industrial",
+  "classic",
+  "japandi",
+  "bohemian",
+] as const;
+
 type Decor8ImageInfo = {
   url?: unknown;
 };
@@ -14,10 +31,12 @@ type Decor8ResponseShape = {
 export type Decor8GenerateInput = {
   inputImageUrls: string[];
   variantsPerImage: number;
-  roomType: string;
-  designStyle: string;
-  colorScheme?: string;
 };
+
+function pickRandomDesignStyle() {
+  const i = Math.floor(Math.random() * DECOR8_DESIGN_STYLES.length);
+  return DECOR8_DESIGN_STYLES[i]!;
+}
 
 export function isDecor8Configured() {
   return Boolean(process.env.DECOR8_API_KEY?.trim());
@@ -35,7 +54,6 @@ async function generateForSingleImage(params: {
   variantsPerImage: number;
   roomType: string;
   designStyle: string;
-  colorScheme?: string;
 }) {
   const generated: string[] = [];
   let remaining = params.variantsPerImage;
@@ -53,7 +71,6 @@ async function generateForSingleImage(params: {
         room_type: params.roomType,
         design_style: params.designStyle,
         num_images: numImages,
-        ...(params.colorScheme ? { color_scheme: params.colorScheme } : {}),
       }),
     });
 
@@ -87,13 +104,13 @@ export async function generateDecor8Designs(input: Decor8GenerateInput) {
 
   const results: string[] = [];
   for (const src of input.inputImageUrls) {
+    const designStyle = pickRandomDesignStyle();
     const fromImage = await generateForSingleImage({
       apiKey,
       inputImageUrl: src,
       variantsPerImage: input.variantsPerImage,
-      roomType: input.roomType,
-      designStyle: input.designStyle,
-      colorScheme: input.colorScheme,
+      roomType: DECOR8_DEFAULT_ROOM_TYPE,
+      designStyle,
     });
     results.push(...fromImage);
   }

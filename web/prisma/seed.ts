@@ -39,6 +39,16 @@ const BROKER_SEEDS = [
   },
 ] as const;
 
+/** Ευρετηρίαση ανά broker seed για φίλτρο περιοχής στον κατάλογο */
+const SEED_BROKER_REGIONS: readonly (readonly string[])[] = [
+  ["athens_metro"],
+  ["thessaloniki_metro"],
+  ["athens_metro"],
+  ["thessaloniki_metro"],
+];
+
+const PROMOTED_BROKER_EMAIL = "seed.nikos@nestio.demo";
+
 const HIGHLIGHT_POOL = [
   "Κοντά στο μετρό",
   "Κοντά στο τραμ",
@@ -108,7 +118,9 @@ function richHighlights(index: number): string[] {
 async function main() {
   const passwordHash = await hashPassword("seedbroker123");
 
-  for (const b of BROKER_SEEDS) {
+  for (let i = 0; i < BROKER_SEEDS.length; i++) {
+    const b = BROKER_SEEDS[i]!;
+    const regions = [...SEED_BROKER_REGIONS[i]!];
     await prisma.user.upsert({
       where: { email: b.email },
       create: {
@@ -119,6 +131,9 @@ async function main() {
         brokerCompanyName: b.brokerCompanyName,
         brokerPhone: b.brokerPhone,
         brokerOnboardingCompleted: true,
+        brokerServiceRegions: regions,
+        brokerPromotionActiveUntil:
+          b.email === PROMOTED_BROKER_EMAIL ? new Date("2099-01-01T00:00:00.000Z") : null,
       },
       update: {
         name: b.name,
@@ -127,6 +142,9 @@ async function main() {
         brokerCompanyName: b.brokerCompanyName,
         brokerPhone: b.brokerPhone,
         brokerOnboardingCompleted: true,
+        brokerServiceRegions: regions,
+        brokerPromotionActiveUntil:
+          b.email === PROMOTED_BROKER_EMAIL ? new Date("2099-01-01T00:00:00.000Z") : null,
       },
     });
   }
