@@ -9,15 +9,11 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Building2,
-  CheckCircle2,
-  Circle,
   Home,
   ImageIcon,
   LayoutList,
   Loader2,
-  Lightbulb,
   MapPin,
-  PenLine,
   Sparkles,
   Trash2,
   UploadCloud,
@@ -52,13 +48,72 @@ const HIGHLIGHT_OPTIONS = [
   { value: "Pets ok", label: "Κατοικίδια" },
 ] as const;
 
-function formatEur(amount: number) {
-  return new Intl.NumberFormat("el-GR", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+const LISTING_CATEGORY_OPTIONS = [
+  { value: "residential", label: "Κατοικία" },
+  { value: "commercial", label: "Επαγ. Στέγη" },
+  { value: "land", label: "Γη" },
+  { value: "other", label: "Λοιπά Ακίνητα" },
+] as const;
+
+const LISTING_PROPERTY_TYPE_OPTIONS = {
+  residential: [
+    "Διαμέρισμα",
+    "Studio/Γκαρσονιέρα",
+    "Μεζονέτα",
+    "Μονοκατοικία",
+    "Βίλλα",
+    "Loft",
+    "Bungalow",
+    "Κτίριο",
+    "Συγκρότημα διαμερισμάτων",
+    "Φάρμα/Ράντσο",
+    "Πλωτό σπίτι",
+    "Άλλες Κατηγορίες",
+  ],
+  commercial: [
+    "Γραφείο",
+    "Κατάστημα",
+    "Αποθήκη",
+    "Βιομηχανικός χώρος",
+    "Βιοτεχνικός χώρος",
+    "Ξενοδοχείο",
+    "Κτίριο επαγγελματικών χώρων",
+    "Αίθουσα",
+    "Εκθεσιακός χώρος",
+    "Άλλες Κατηγορίες",
+  ],
+  land: ["Οικόπεδο", "Αγροτεμάχιο", "Νησί", "Άλλες Κατηγορίες"],
+  other: ["Πάρκινγκ", "Επιχείρηση", "Προκατασκευασμένο", "Λυόμενο", "Αέρας", "Άλλες Κατηγορίες"],
+} as const;
+
+const FLOOR_OPTIONS = ["Ισόγειο", "1ος", "2ος", "3ος", "4ος+", "Ρετιρέ"] as const;
+const ORIENTATION_OPTIONS = ["Ανατολικός", "Δυτικός", "Νότιος", "Βόρειος"] as const;
+const ZONE_OPTIONS = ["Οικιστική", "Αγροτική", "Εμπορική", "Βιομηχανική", "Ανάπλασης", "Εκτός σχεδίου"] as const;
+const SPACE_KEYS = ["bedrooms", "bathrooms", "wc", "kitchen", "living"] as const;
+const SPACE_LABELS: Record<(typeof SPACE_KEYS)[number], string> = {
+  bedrooms: "υπνοδωμάτιο",
+  bathrooms: "μπάνιο",
+  wc: "WC",
+  kitchen: "κουζίνα",
+  living: "σαλόνι",
+};
+const EXTRA_FEATURE_OPTIONS = [
+  "Θέση στάθμευσης",
+  "Ασανσέρ",
+  "Πόρτα ασφαλείας",
+  "Συναγερμός",
+  "Επιπλωμένο",
+  "Αποθήκη",
+  "Τζάκι",
+  "Βεράντα",
+  "Εσωτερική σκάλα",
+  "Κήπος",
+  "Πισίνα",
+  "Playroom",
+  "Σοφίτα",
+  "Θέα",
+  "Ηλιακός θερμοσίφωνας",
+] as const;
 
 function Field({
   id,
@@ -81,6 +136,41 @@ function Field({
       {hint ? <p className="text-[13px] leading-relaxed text-muted-foreground">{hint}</p> : null}
       <div className="pt-0.5">{children}</div>
     </div>
+  );
+}
+
+function SimpleRadioOption({
+  label,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm font-medium transition-all",
+        selected
+          ? "border-primary/40 bg-primary/[0.08] text-foreground"
+          : "border-border/65 bg-background text-foreground/80 hover:border-border/90 hover:bg-muted/40 hover:text-foreground"
+      )}
+      aria-pressed={selected}
+    >
+      <span
+        className={cn(
+          "inline-flex size-5 shrink-0 items-center justify-center rounded-full border",
+          selected ? "border-primary bg-primary/10" : "border-border/80 bg-background"
+        )}
+        aria-hidden
+      >
+        {selected ? <span className="size-2 rounded-full bg-primary" /> : null}
+      </span>
+      <span>{label}</span>
+    </button>
   );
 }
 
@@ -143,19 +233,6 @@ function SectionShell({
   );
 }
 
-function CheckRow({ done, label }: { done: boolean; label: string }) {
-  return (
-    <div className="flex items-center gap-3 py-1 text-[15px] leading-snug">
-      {done ? (
-        <CheckCircle2 className="size-4 shrink-0 text-primary" aria-hidden />
-      ) : (
-        <Circle className="size-4 shrink-0 text-muted-foreground/40" aria-hidden />
-      )}
-      <span className={cn(done ? "text-foreground" : "text-muted-foreground")}>{label}</span>
-    </div>
-  );
-}
-
 type UploadedPhoto = {
   id: string;
   src: string;
@@ -187,6 +264,22 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [description, setDescription] = useState("");
+  const [listingCategory, setListingCategory] = useState<(typeof LISTING_CATEGORY_OPTIONS)[number]["value"] | null>(null);
+  const [listingPropertyType, setListingPropertyType] = useState<string | null>(null);
+  const [landSqm, setLandSqm] = useState("");
+  const [floor, setFloor] = useState<string>("");
+  const [isPenthouse, setIsPenthouse] = useState<"yes" | "no" | null>(null);
+  const [orientation, setOrientation] = useState<string>("");
+  const [levels, setLevels] = useState(1);
+  const [spaceCounts, setSpaceCounts] = useState<Record<(typeof SPACE_KEYS)[number], number>>({
+    bedrooms: 0,
+    bathrooms: 0,
+    wc: 0,
+    kitchen: 0,
+    living: 0,
+  });
+  const [selectedExtraFeatures, setSelectedExtraFeatures] = useState<Set<string>>(new Set());
+  const [zone, setZone] = useState<string>("");
   const [priceEur, setPriceEur] = useState("");
   const [rooms, setRooms] = useState<string>("2");
   const [dealType, setDealType] = useState<"rent" | "sale">("rent");
@@ -212,6 +305,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
   const [dragOverPhotoId, setDragOverPhotoId] = useState<string | null>(null);
   const [generateAiRedesigns, setGenerateAiRedesigns] = useState(false);
   const [aiVariantsPerImage, setAiVariantsPerImage] = useState("5");
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editLoadState, setEditLoadState] = useState<"loading" | "ready" | "error">(() =>
@@ -268,6 +362,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
         setDescription(data.description ?? "");
         setPriceEur(String(data.priceEur));
         setDealType((data.dealType ?? "rent") === "sale" ? "sale" : "rent");
+        setListingCategory((prev) => prev ?? "residential");
         if (data.roomsCount === 0) setRooms("studio");
         else if (data.roomsCount >= 3) setRooms("3+");
         else setRooms(String(data.roomsCount));
@@ -317,16 +412,27 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
     });
   };
 
+  function incrementSpace(key: (typeof SPACE_KEYS)[number]) {
+    setSpaceCounts((prev) => ({ ...prev, [key]: Math.min(prev[key] + 1, 20) }));
+  }
+
+  function decrementSpace(key: (typeof SPACE_KEYS)[number]) {
+    setSpaceCounts((prev) => ({ ...prev, [key]: Math.max(prev[key] - 1, 0) }));
+  }
+
+  function toggleExtraFeature(feature: string) {
+    setSelectedExtraFeatures((prev) => {
+      const next = new Set(prev);
+      if (next.has(feature)) next.delete(feature);
+      else next.add(feature);
+      return next;
+    });
+  }
+
   const roomsCountForApi = useMemo(() => {
     if (rooms === "studio") return 0;
     if (rooms === "3+") return 3;
     return Number(rooms);
-  }, [rooms]);
-
-  const roomsLabel = useMemo(() => {
-    if (rooms === "studio") return "Στούντιο";
-    if (rooms === "3+") return "3+ δωμ.";
-    return `${rooms} δωμ.`;
   }, [rooms]);
 
   const parsedPrice = useMemo(() => {
@@ -339,33 +445,30 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
     return Number.isFinite(s) && s > 0 ? Math.round(s) : null;
   }, [sqm]);
 
-  const previewSubtitle = useMemo(() => {
-    if (subtitle.trim()) return subtitle.trim();
-    if (parsedSqm !== null && roomsCountForApi >= 0) {
-      const bed =
-        roomsCountForApi === 0 ? "Στούντιο" : roomsCountForApi === 3 ? "3+ υπν." : `${roomsCountForApi} υπν.`;
-      return `${bed} · ${parsedSqm} m²`;
-    }
-    return null;
-  }, [subtitle, parsedSqm, roomsCountForApi]);
+  const categoryLabel = useMemo(() => {
+    if (!listingCategory) return "Ακίνητο";
+    return LISTING_CATEGORY_OPTIONS.find((x) => x.value === listingCategory)?.label ?? "Ακίνητο";
+  }, [listingCategory]);
 
-  const previewHighlights = useMemo(() => {
-    const extra = highlightsExtra
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean);
-    const fromSet = [...selectedHighlights].map((v) => HIGHLIGHT_OPTIONS.find((o) => o.value === v)?.label ?? v);
-    return [...new Set([...fromSet, ...extra])].slice(0, 5);
-  }, [selectedHighlights, highlightsExtra]);
+  const fallbackListingTitle = useMemo(() => {
+    const typePart = listingPropertyType ? ` - ${listingPropertyType}` : "";
+    const sqmPart = parsedSqm !== null ? ` ${parsedSqm} τ.μ.` : "";
+    return `${categoryLabel}${typePart}${sqmPart}`.trim();
+  }, [categoryLabel, listingPropertyType, parsedSqm]);
 
-  const hasTitle = title.trim().length > 0;
+  const hasCategory = listingCategory !== null;
+  const hasPropertyType = listingPropertyType !== null;
   const hasPrice = parsedPrice !== null;
   const hasSqm = parsedSqm !== null;
   const hasHighlights = selectedHighlights.size > 0 || highlightsExtra.trim().length > 0;
+  const hasAnySpaceCount = SPACE_KEYS.some((key) => spaceCounts[key] > 0);
+  const hasExtraFeatures = selectedExtraFeatures.size > 0;
+  const hasLayoutData = levels > 1 || hasAnySpaceCount || hasExtraFeatures;
+  const hasAddress = addressLine.trim().length > 0;
+  const hasValidMapPoint = Number.isFinite(Number(lat.replace(",", "."))) && Number.isFinite(Number(lng.replace(",", ".")));
   const parsedUploadedImages = useMemo(() => {
     return uploadedPhotos.map((photo) => photo.src);
   }, [uploadedPhotos]);
-  const coverImageSrc = parsedUploadedImages[0] ?? "";
   const parsedAiVariants = useMemo(() => {
     const n = Number(aiVariantsPerImage);
     return Number.isFinite(n) ? Math.floor(n) : NaN;
@@ -382,6 +485,48 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
       lng: Number.isFinite(ln) ? ln : DEFAULT_LNG,
     };
   }, [lat, lng]);
+  const listingSteps = useMemo(
+    () => [
+      {
+        key: "category",
+        title: "Κατηγορία ακινήτου",
+        shortTitle: "Κατηγορία",
+        done: hasCategory && hasPropertyType,
+      },
+      {
+        key: "basics",
+        title: "Βασικά στοιχεία",
+        shortTitle: "Στοιχεία",
+        done: hasPrice && hasSqm,
+      },
+      {
+        key: "highlights",
+        title: "Χώροι & χαρακτηριστικά",
+        shortTitle: "Χώροι/Extras",
+        done: hasHighlights || hasLayoutData,
+      },
+      {
+        key: "media-location",
+        title: "Φωτογραφία & τοποθεσία",
+        shortTitle: "Εικόνες/Χάρτης",
+        done: hasAddress && hasValidMapPoint,
+      },
+    ],
+    [hasCategory, hasPropertyType, hasPrice, hasSqm, hasHighlights, hasLayoutData, hasAddress, hasValidMapPoint]
+  );
+  const propertyTypeOptions = useMemo(() => {
+    if (!listingCategory) return [];
+    return LISTING_PROPERTY_TYPE_OPTIONS[listingCategory];
+  }, [listingCategory]);
+  const totalSteps = listingSteps.length;
+  const completedStepsCount = listingSteps.filter((step) => step.done).length;
+  const isLastStep = activeStepIndex === totalSteps - 1;
+  const progressPercent = Math.round((completedStepsCount / totalSteps) * 100);
+  const canContinueCurrentStep = useMemo(() => {
+    if (activeStepIndex === 0) return (hasCategory && hasPropertyType) || isEdit;
+    if (activeStepIndex === 1) return hasPrice && hasSqm;
+    return true;
+  }, [activeStepIndex, hasCategory, hasPropertyType, hasPrice, hasSqm, isEdit]);
 
   /**
    * Reverse geocode με debounce — καλείται απευθείας από τον χάρτη (όχι μόνο από useEffect(lat,lng)):
@@ -664,7 +809,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
   const canSubmit = useMemo(() => {
     if (isEdit && editLoadState !== "ready") return false;
     if (uploadingPhotos) return false;
-    if (!title.trim()) return false;
+    if (!isEdit && (!hasCategory || !hasPropertyType)) return false;
     if (!addressLine.trim()) return false;
     const p = Number(priceEur.replace(/\s/g, "").replace(",", "."));
     const s = Number(sqm.replace(/\s/g, "").replace(",", "."));
@@ -683,7 +828,8 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
     isEdit,
     editLoadState,
     uploadingPhotos,
-    title,
+    hasCategory,
+    hasPropertyType,
     addressLine,
     priceEur,
     sqm,
@@ -695,8 +841,34 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
     parsedAiVariants,
   ]);
 
+  function goToStep(index: number) {
+    if (index < 0 || index >= totalSteps) return;
+    setActiveStepIndex(index);
+    setError(null);
+  }
+
+  function goToNextStep() {
+    if (!canContinueCurrentStep) {
+      if (activeStepIndex === 0) {
+        setError("Διάλεξε κατηγορία και είδος ακινήτου για να συνεχίσεις.");
+      } else if (activeStepIndex === 1) {
+        setError("Συμπλήρωσε τιμή και εμβαδόν για να συνεχίσεις.");
+      }
+      return;
+    }
+    goToStep(activeStepIndex + 1);
+  }
+
+  function goToPreviousStep() {
+    goToStep(activeStepIndex - 1);
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!isLastStep) {
+      goToNextStep();
+      return;
+    }
     if (!canSubmit || loading) return;
     setLoading(true);
     setError(null);
@@ -714,6 +886,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
     const subtitleForApi =
       subtitle.trim() ||
       `${roomsCountForApi === 0 ? "Studio" : `${roomsCountForApi} bed`} · ${sqmRounded} m²`;
+    const finalTitle = title.trim() || fallbackListingTitle || "Ακίνητο";
 
     try {
       if (listingId) {
@@ -721,7 +894,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
           method: "PATCH",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            title: title.trim(),
+            title: finalTitle,
             subtitle: subtitleForApi,
             description: description.trim(),
             priceEur: Math.round(Number(priceEur.replace(/\s/g, "").replace(",", "."))),
@@ -761,7 +934,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          title: title.trim(),
+          title: finalTitle,
           subtitle: subtitle.trim() || undefined,
           description: description.trim() || undefined,
           priceEur: Math.round(Number(priceEur.replace(/\s/g, "").replace(",", "."))),
@@ -971,246 +1144,397 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
             {isEdit ? "Οι αγγελίες μου" : "Αρχική"}
           </Link>
 
-          <div className="relative z-[1] flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between lg:gap-12">
-            <div className="max-w-2xl">
-              <div className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-3 text-xs font-medium text-muted-foreground">
-                {[
-                  { n: "1", t: "Στοιχεία" },
-                  { n: "2", t: "Χαρακτηριστικά" },
-                  { n: "3", t: "Εικόνα & χάρτης" },
-                ].map((s, i) => (
-                  <span key={s.n} className="flex items-center gap-1">
-                    {i > 0 ? <span className="px-1 text-border">/</span> : null}
-                    <span className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/85 px-3.5 py-1.5">
-                      <span className="flex size-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                        {s.n}
-                      </span>
-                      {s.t}
-                    </span>
-                  </span>
-                ))}
-              </div>
-              <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-[2rem] sm:leading-tight">
-                {isEdit ? "Επεξεργασία αγγελίας" : "Νέα αγγελία"}
-              </h1>
-              <p className="mt-4 max-w-xl text-[15px] leading-[1.65] text-muted-foreground sm:text-base sm:leading-relaxed">
-                {isEdit
-                  ? "Ενημέρωσε στοιχεία, τιμή, φωτογραφίες και τοποθεσία. Η προεπισκόπηση ενημερώνεται ζωντανά."
-                  : "Δημιούργησε μια καθαρή, ελκυστική καταχώρηση. Στα δεξιά βλέπεις ζωντανή προεπισκόπηση — ό,τι γράφεις ενημερώνεται αμέσως."}
-              </p>
-            </div>
-            <div className="relative z-[1] max-w-md shrink-0 rounded-2xl border border-primary/12 bg-primary/[0.04] px-5 py-4 text-[15px] leading-relaxed text-primary">
-              <LayoutList className="mb-2 size-5 opacity-75" aria-hidden />
-              <span className="font-medium">
-                {isEdit
-                  ? "Οι αλλαγές θα φαίνονται αμέσως στη σελίδα της αγγελίας και στη λίστα αποτελεσμάτων."
-                  : "Μετά τη δημοσίευση θα εμφανίζεται στην αρχική και στον χάρτη."}
-              </span>
-            </div>
+          <div className="relative z-[1] max-w-2xl">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-[2rem] sm:leading-tight">
+              {isEdit ? "Επεξεργασία αγγελίας" : "Νέα αγγελία"}
+            </h1>
+            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted-foreground sm:text-base">
+              Συμπλήρωσε τα στοιχεία βήμα-βήμα. Σε κάθε οθόνη βλέπεις μόνο ό,τι χρειάζεται τώρα.
+            </p>
           </div>
         </div>
 
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-stretch lg:gap-12">
           <form id="listing-editor-form" onSubmit={onSubmit} className="space-y-8 sm:space-y-10">
-            <SectionShell
-              step="Βήμα 01"
-              icon={Home}
-              title="Βασικά στοιχεία"
-              description="Τίτλος, τιμή και μέγεθος — αυτά εμφανίζονται πρώτα στη λίστα αποτελεσμάτων."
-              accent="primary"
-            >
-              <div className="grid gap-8">
-                <div className="rounded-2xl border border-border/40 bg-muted/20 p-5 sm:p-6">
-                  <div className="text-sm font-medium text-foreground">Τύπος συναλλαγής</div>
-                  <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-                    Ενοικίαση ή πώληση — εμφανίζεται στην κάρτα και στο φιλτράρισμα.
+            <Card className="rounded-2xl border-border/50 bg-card/85 p-5 shadow-sm ring-1 ring-border/25 sm:p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    Βήμα {activeStepIndex + 1} από {totalSteps}
                   </p>
-                  <div className="mt-5 inline-flex rounded-xl border border-border/50 bg-background p-1">
-                    <button
-                      type="button"
-                      onClick={() => setDealType("rent")}
-                      className={cn(
-                        "h-10 rounded-lg px-5 text-sm font-medium transition-colors",
-                        dealType === "rent"
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                      aria-pressed={dealType === "rent"}
-                    >
-                      Ενοικίαση
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDealType("sale")}
-                      className={cn(
-                        "h-10 rounded-lg px-5 text-sm font-medium transition-colors",
-                        dealType === "sale"
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                      aria-pressed={dealType === "sale"}
-                    >
-                      Πώληση
-                    </button>
+                  <p className="mt-1 text-[13px] text-muted-foreground">{listingSteps[activeStepIndex]?.title}</p>
+                </div>
+                <span className="rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+                  Πρόοδος {progressPercent}%
+                </span>
+              </div>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted/70">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${Math.max(progressPercent, 8)}%` }}
+                />
+              </div>
+            </Card>
+
+            {activeStepIndex === 0 ? (
+              <SectionShell
+                step="Βήμα 01"
+                icon={LayoutList}
+                title="Κατηγορία ακινήτου"
+                description="Ξεκίνα επιλέγοντας κατηγορία και είδος ακινήτου."
+                accent="primary"
+              >
+                <div className="rounded-2xl border border-border/45 bg-gradient-to-b from-muted/20 to-background/90 p-5 sm:p-6">
+                  <p className="mb-3 text-lg font-medium text-foreground">Επίλεξε την κατηγορία του ακινήτου</p>
+                  <div className="space-y-2.5">
+                    {LISTING_CATEGORY_OPTIONS.map((option) => {
+                      const checked = listingCategory === option.value;
+                      return (
+                        <SimpleRadioOption
+                          key={option.value}
+                          label={option.label}
+                          selected={checked}
+                          onSelect={() => {
+                            setListingCategory(option.value);
+                            setListingPropertyType(null);
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  <p className="mb-3 mt-8 text-lg font-medium text-foreground">Επίλεξε το είδος του ακινήτου</p>
+                  <div className="rounded-xl border border-border/55 bg-background/90 p-3 sm:p-4">
+                    {listingCategory ? (
+                      <div className="space-y-2.5">
+                        {propertyTypeOptions.map((propertyType) => (
+                          <SimpleRadioOption
+                            key={propertyType}
+                            label={propertyType}
+                            selected={listingPropertyType === propertyType}
+                            onSelect={() => setListingPropertyType(propertyType)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="px-2 py-3 text-sm text-muted-foreground">
+                        Διάλεξε πρώτα κατηγορία ακινήτου για να εμφανιστούν οι επιλογές.
+                      </p>
+                    )}
                   </div>
                 </div>
+              </SectionShell>
+            ) : null}
 
-                <Field id="listing-title" label="Τίτλος αγγελίας" hint="Κράτα τον σύντομο: περιοχή + τύπος ακινήτου.">
-                  <Input
-                    id="listing-title"
-                    className="h-12 rounded-xl border-border/50 bg-background"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Π.χ. Κουκάκι · Διαμέρισμα"
-                    required
-                    autoComplete="off"
-                  />
-                </Field>
+            {activeStepIndex === 1 ? (
+            <SectionShell
+              step="Βήμα 02"
+              icon={Home}
+              title="Βασικά χαρακτηριστικά"
+              description="Συμπλήρωσε τα βασικά πεδία."
+              accent="primary"
+            >
+              <div className="mx-auto w-full max-w-4xl space-y-8">
+                <section className="space-y-4">
+                  <p className="text-xl font-semibold text-foreground">Κύρια στοιχεία</p>
+                  <div className="w-full max-w-xl space-y-4">
+                    <Field id="listing-price" label="Τιμή ακινήτου (υποχρεωτικό)" className="space-y-2">
+                      <Input
+                        id="listing-price"
+                        className="h-12 rounded-xl border-border/60 bg-background"
+                        value={priceEur}
+                        onChange={(e) => setPriceEur(e.target.value)}
+                        inputMode="decimal"
+                        placeholder="π.χ. 950"
+                        required
+                      />
+                    </Field>
+                    <Field id="listing-rooms" label="Υπνοδωμάτια" className="space-y-2">
+                      <Select value={rooms} onValueChange={(v) => v != null && setRooms(v)}>
+                        <SelectTrigger id="listing-rooms" className="h-12 w-full rounded-xl border-border/60 bg-background">
+                          <SelectValue placeholder="Επίλεξε" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="studio">Στούντιο</SelectItem>
+                          <SelectItem value="1">1</SelectItem>
+                          <SelectItem value="2">2</SelectItem>
+                          <SelectItem value="3+">3+</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field id="listing-sqm" label="Εμβαδόν ακινήτου (υποχρεωτικό)" className="space-y-2">
+                      <Input
+                        id="listing-sqm"
+                        className="h-12 rounded-xl border-border/60 bg-background"
+                        value={sqm}
+                        onChange={(e) => setSqm(e.target.value)}
+                        inputMode="decimal"
+                        placeholder="π.χ. 70"
+                        required
+                      />
+                    </Field>
+                  </div>
+                </section>
 
-                <Field
-                  id="listing-subtitle"
-                  label="Υπότιτλος (προαιρετικό)"
-                  hint="Δωμάτια, τετραγωνικά, όροφος. Αν το αφήσεις κενό, θα δημιουργηθεί αυτόματα από τα πεδία πιο κάτω."
-                >
-                  <textarea
-                    id="listing-subtitle"
-                    rows={3}
-                    className={cn(
-                      "min-h-[5.5rem] w-full resize-y rounded-xl border border-input bg-background px-4 py-3 text-[15px] leading-relaxed",
-                      "outline-none transition-colors placeholder:text-muted-foreground",
-                      "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                    )}
-                    value={subtitle}
-                    onChange={(e) => setSubtitle(e.target.value)}
-                    placeholder="2 υπνοδωμάτια · 70 m² · 3ος όροφος"
-                  />
-                </Field>
-
-                <Field
-                  id="listing-description"
-                  label="Περιγραφή (προαιρετικό)"
-                  hint="Εμφανίζεται στη σελίδα της αγγελίας πριν τα χαρακτηριστικά. Μπορείς να χρησιμοποιήσεις νέες γραμμές."
-                >
-                  <textarea
-                    id="listing-description"
-                    rows={6}
-                    className={cn(
-                      "min-h-[9rem] w-full resize-y rounded-xl border border-input bg-background px-4 py-3 text-[15px] leading-relaxed",
-                      "outline-none transition-colors placeholder:text-muted-foreground",
-                      "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                    )}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Περιέγραψε το ακίνητο, τη γειτονιά, κατάσταση, θέρμανση, διαθεσιμότητα κ.λπ."
-                  />
-                </Field>
-
-                <div className="grid gap-7 sm:grid-cols-3 sm:gap-6">
-                  <Field
-                    id="listing-price"
-                    label="Τιμή (€)"
-                    hint={
-                      dealType === "sale"
-                        ? "Συνολική τιμή πώλησης του ακινήτου."
-                        : "Μηνιαίο μίσθωμα (ανά μήνα)."
-                    }
-                  >
+                <section className="space-y-4 border-t border-border/50 pt-6">
+                  <Field id="listing-land-sqm" label="Εμβαδόν οικοπέδου" className="w-full max-w-xl space-y-2">
                     <Input
-                      id="listing-price"
-                      className="h-12 rounded-xl border-border/50 bg-background"
-                      value={priceEur}
-                      onChange={(e) => setPriceEur(e.target.value)}
+                      id="listing-land-sqm"
+                      className="h-12 rounded-xl border-border/60 bg-background"
+                      value={landSqm}
+                      onChange={(e) => setLandSqm(e.target.value)}
                       inputMode="decimal"
-                      placeholder="950"
-                      required
+                      placeholder="π.χ. 120"
                     />
                   </Field>
-                  <Field id="listing-rooms" label="Δωμάτια" hint="Πόσα υπνοδωμάτια (ή στούντιο).">
-                    <Select value={rooms} onValueChange={(v) => v != null && setRooms(v)}>
-                      <SelectTrigger
-                        id="listing-rooms"
-                        className="h-12 w-full rounded-xl border-border/50 bg-background"
-                      >
+
+                  <Field id="listing-floor" label="Επίλεξε όροφο" className="w-full max-w-xl space-y-2">
+                    <Select value={floor} onValueChange={setFloor}>
+                      <SelectTrigger id="listing-floor" className="h-12 w-full rounded-xl border-border/60 bg-background">
                         <SelectValue placeholder="Επίλεξε" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="studio">Στούντιο</SelectItem>
-                        <SelectItem value="1">1</SelectItem>
-                        <SelectItem value="2">2</SelectItem>
-                        <SelectItem value="3+">3+</SelectItem>
+                        {FLOOR_OPTIONS.map((f) => (
+                          <SelectItem key={f} value={f}>
+                            {f}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field id="listing-sqm" label="Εμβαδόν (m²)">
-                    <Input
-                      id="listing-sqm"
-                      className="h-12 rounded-xl border-border/50 bg-background"
-                      value={sqm}
-                      onChange={(e) => setSqm(e.target.value)}
-                      inputMode="decimal"
-                      placeholder="70"
-                      required
-                    />
+
+                  <div className="w-full max-w-xl space-y-2">
+                    <p className="text-sm font-medium text-foreground">Είναι ρετιρέ;</p>
+                    <div className="flex items-center gap-5">
+                      <label className="inline-flex items-center gap-2 text-sm text-foreground">
+                        <input
+                          type="radio"
+                          name="is-penthouse"
+                          checked={isPenthouse === "yes"}
+                          onChange={() => setIsPenthouse("yes")}
+                        />
+                        Ναι
+                      </label>
+                      <label className="inline-flex items-center gap-2 text-sm text-foreground">
+                        <input
+                          type="radio"
+                          name="is-penthouse"
+                          checked={isPenthouse === "no"}
+                          onChange={() => setIsPenthouse("no")}
+                        />
+                        Όχι
+                      </label>
+                    </div>
+                  </div>
+
+                  <Field id="listing-orientation" label="Προσανατολισμός" className="w-full max-w-xl space-y-2">
+                    <Select value={orientation} onValueChange={setOrientation}>
+                      <SelectTrigger id="listing-orientation" className="h-12 w-full rounded-xl border-border/60 bg-background">
+                        <SelectValue placeholder="Επίλεξε" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ORIENTATION_OPTIONS.map((o) => (
+                          <SelectItem key={o} value={o}>
+                            {o}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </Field>
-                </div>
+
+                </section>
+
+                <section className="space-y-2 border-t border-border/50 pt-6">
+                  <Field id="listing-zone" label="Ζώνη" className="w-full max-w-xl space-y-2">
+                    <Select value={zone} onValueChange={setZone}>
+                      <SelectTrigger id="listing-zone" className="h-12 w-full rounded-xl border-border/60 bg-background">
+                        <SelectValue placeholder="Επίλεξε" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ZONE_OPTIONS.map((z) => (
+                          <SelectItem key={z} value={z}>
+                            {z}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </section>
               </div>
             </SectionShell>
+            ) : null}
 
-            <SectionShell
-              step="Βήμα 02"
-              icon={Sparkles}
-              title="Χαρακτηριστικά"
-              description="Βοηθούν τους ενδιαφερόμενους να φιλτράρουν γρήγορα. Πρόσθεσε και δικά σου με κόμμα."
-              accent="violet"
-            >
-              <div className="flex flex-wrap gap-2.5">
-                {HIGHLIGHT_OPTIONS.map(({ value, label }) => {
-                  const active = selectedHighlights.has(value);
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => toggleHighlight(value)}
-                      className={cn(
-                        "h-10 rounded-full border px-4 text-sm font-medium transition-all",
-                        active
-                          ? "border-primary/40 bg-accent text-accent-foreground"
-                          : "border-border/50 bg-background/80 text-muted-foreground hover:border-border/80 hover:bg-muted/60 hover:text-foreground"
-                      )}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-              <Field
-                id="listing-highlights-extra"
-                label="Επιπλέον λέξεις-κλειδιά"
-                hint="Χώρισέ τες με κόμμα · π.χ. Ήσυχο, Θέα, Νεόδμητο"
-                className="mt-8"
-              >
-                <Input
-                  id="listing-highlights-extra"
-                  className="h-12 rounded-xl border-border/50 bg-background"
-                  value={highlightsExtra}
-                  onChange={(e) => setHighlightsExtra(e.target.value)}
-                  placeholder="Ήσυχο, Θέα στη θάλασσα"
-                />
-              </Field>
-            </SectionShell>
-
+            {activeStepIndex === 2 ? (
             <SectionShell
               step="Βήμα 03"
+              icon={Sparkles}
+              title="Χώροι & χαρακτηριστικά"
+              description="Όρισε χώρους και επιπλέον παροχές του ακινήτου."
+              accent="violet"
+            >
+              <div className="mx-auto w-full max-w-4xl space-y-6">
+                <section className="space-y-4">
+                  <div className="w-full max-w-xl space-y-2">
+                    <p className="text-sm font-medium text-foreground">Επίπεδα</p>
+                    <div className="flex items-center justify-between rounded-2xl border border-border/55 bg-background px-4 py-3">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Αριθμός επιπέδων</p>
+                        <p className="text-xs text-muted-foreground">Όσα επίπεδα έχει συνολικά το ακίνητο.</p>
+                      </div>
+                      <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-2 py-1">
+                        <button
+                          type="button"
+                          onClick={() => setLevels((prev) => Math.max(prev - 1, 1))}
+                          className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background text-lg leading-none text-muted-foreground transition-colors hover:border-border hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
+                          aria-label="Μείωση επιπέδων"
+                          disabled={levels <= 1}
+                        >
+                          -
+                        </button>
+                        <span className="min-w-[64px] text-center text-sm font-semibold text-foreground">{levels}</span>
+                        <button
+                          type="button"
+                          onClick={() => setLevels((prev) => Math.min(prev + 1, 10))}
+                          className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background text-lg leading-none text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                          aria-label="Αύξηση επιπέδων"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="w-full max-w-xl space-y-2">
+                    <p className="text-sm font-medium text-foreground">Χώροι</p>
+                    <div className="overflow-hidden rounded-2xl border border-border/55 bg-background">
+                      {SPACE_KEYS.map((key) => {
+                        const count = spaceCounts[key];
+                        const label = SPACE_LABELS[key];
+                        return (
+                          <div
+                            key={key}
+                            className="flex items-center justify-between gap-3 border-b border-border/40 px-4 py-3 transition-colors last:border-b-0 hover:bg-muted/20"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{label}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {count === 0 ? `Χωρίς ${label}` : `${count} ${label}`}
+                              </p>
+                            </div>
+                            <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-2 py-1">
+                              <button
+                                type="button"
+                                onClick={() => decrementSpace(key)}
+                                className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background text-lg leading-none text-muted-foreground transition-colors hover:border-border hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
+                                aria-label={`Μείωση ${label}`}
+                                disabled={count <= 0}
+                              >
+                                -
+                              </button>
+                              <span className="min-w-8 text-center text-sm font-semibold text-foreground">{count}</span>
+                              <button
+                                type="button"
+                                onClick={() => incrementSpace(key)}
+                                className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background text-lg leading-none text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                                aria-label={`Αύξηση ${label}`}
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-4 border-t border-border/50 pt-6">
+                  <p className="text-sm font-semibold text-foreground">Επιπλέον χαρακτηριστικά</p>
+                  <p className="text-xs text-muted-foreground">Επίλεξε μόνο όσα υπάρχουν στο ακίνητο.</p>
+                  <div className="grid w-full max-w-xl gap-3 md:grid-cols-2">
+                    {EXTRA_FEATURE_OPTIONS.map((feature) => {
+                      const checked = selectedExtraFeatures.has(feature);
+                      return (
+                        <label
+                          key={feature}
+                          className={cn(
+                            "group inline-flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors",
+                            checked
+                              ? "border-primary/45 bg-primary/[0.08] text-foreground"
+                              : "border-border/60 bg-background text-foreground/90 hover:border-border/80 hover:bg-muted/30"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={checked}
+                            onChange={() => toggleExtraFeature(feature)}
+                          />
+                          <span
+                            className={cn(
+                              "inline-flex size-5 shrink-0 items-center justify-center rounded-md border text-[12px] font-bold transition-colors",
+                              checked
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border/70 bg-background text-transparent group-hover:text-muted-foreground/40"
+                            )}
+                            aria-hidden
+                          >
+                            ✓
+                          </span>
+                          <span className="leading-tight">{feature}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                <section className="space-y-4 border-t border-border/50 pt-6">
+                  <div className="flex flex-wrap gap-2.5">
+                    {HIGHLIGHT_OPTIONS.map(({ value, label }) => {
+                      const active = selectedHighlights.has(value);
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => toggleHighlight(value)}
+                          className={cn(
+                            "h-10 rounded-full border px-4 text-sm font-medium transition-all",
+                            active
+                              ? "border-primary/40 bg-accent text-accent-foreground"
+                              : "border-border/50 bg-background/80 text-muted-foreground hover:border-border/80 hover:bg-muted/60 hover:text-foreground"
+                          )}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <Field id="listing-highlights-extra" label="Επιπλέον λέξεις-κλειδιά" className="w-full max-w-xl">
+                    <Input
+                      id="listing-highlights-extra"
+                      className="h-12 rounded-xl border-border/50 bg-background"
+                      value={highlightsExtra}
+                      onChange={(e) => setHighlightsExtra(e.target.value)}
+                      placeholder="π.χ. Ήσυχο, Θέα, Ανακαινισμένο"
+                    />
+                  </Field>
+                </section>
+              </div>
+            </SectionShell>
+            ) : null}
+
+            {activeStepIndex === 3 ? (
+            <SectionShell
+              step="Βήμα 04"
               icon={ImageIcon}
               title="Φωτογραφία & τοποθεσία"
-              description="Ανέβασε φωτογραφίες και όρισε διεύθυνση, ορατότητα τοποθεσίας και σημείο στον χάρτη."
+              description="Ανέβασε εικόνες και όρισε σωστά την τοποθεσία."
               accent="amber"
             >
-              <div className="mb-8 rounded-2xl border border-border/45 bg-gradient-to-b from-muted/25 to-background/90 p-5 sm:p-7">
+              <div className="mb-6 rounded-xl border border-border/45 bg-background p-5 sm:p-6">
                 <Field
                   id="listing-photo-uploader"
                   label="Φωτογραφίες αγγελίας"
-                  hint="Κάνε drag & drop ή επίλεξε αρχεία. Μπορείς να σβήσεις όσες δεν θέλεις πριν τη δημοσίευση."
                 >
                   <div
                     id="listing-photo-uploader"
@@ -1315,18 +1639,12 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
                   </div>
                 ) : null}
 
-                <div className="mt-5 rounded-xl border border-border/45 bg-gradient-to-b from-primary/[0.04] to-background/85 px-4 py-4 sm:px-5">
+                <div className="mt-5 rounded-xl border border-border/45 bg-muted/15 px-4 py-4 sm:px-5">
                   <div className="flex gap-3">
                     <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                    <div className="min-w-0 space-y-1.5">
-                      <p className="text-sm font-medium leading-snug text-foreground">
-                        Παραλλαγές χώρου με τεχνητή νοημοσύνη
-                      </p>
-                      <p className="text-[13px] leading-relaxed text-muted-foreground">
-                        Δημιουργήστε εναλλακτικές εικόνες του ακινήτου σας, ώστε να αναδειχθεί όσο καλύτερα γίνεται και να
-                        τραβήξει το ενδιαφέρον όσων το ψάχνουν.
-                      </p>
-                      <p className="text-xs text-muted-foreground/90">Υλοποίηση μέσω Decor8.</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium leading-snug text-foreground">Παραλλαγές με AI (προαιρετικό)</p>
+                      <p className="mt-1 text-[13px] text-muted-foreground">Δημιουργούνται αυτόματα από τις φωτογραφίες που ανέβασες.</p>
                     </div>
                   </div>
                   <div className="mt-4 flex items-start gap-3 border-t border-border/45 pt-4">
@@ -1345,19 +1663,16 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
 
                 {generateAiRedesigns ? (
                   <div className="mt-5 space-y-4 rounded-xl border border-primary/20 bg-primary/[0.04] p-4 sm:p-5">
-                    <Field id="ai-variants" label="Πόσες παραλλαγές ανά φωτογραφία;" hint="Από 1 έως 10. Το στυλ επιλέγεται αυτόματα κάθε φορά για ποικιλία.">
+                    <Field id="ai-variants" label="Παραλλαγές ανά φωτογραφία (1-10)">
                       <Input
                         id="ai-variants"
                         className="h-11 max-w-[160px] rounded-xl border-border/50 bg-background"
                         value={aiVariantsPerImage}
                         onChange={(e) => setAiVariantsPerImage(e.target.value)}
                         inputMode="numeric"
-                        placeholder="5"
+                        placeholder="π.χ. 5"
                       />
                     </Field>
-                    <p className="text-[13px] leading-relaxed text-muted-foreground">
-                      Δεν χρειάζεται να διαλέξεις τύπο χώρου ή χρώματα — η υπηρεσία χρησιμοποιεί προεπιλογές ώστε να πατήσεις μόνο ένα νούμερο και να προχωρήσεις.
-                    </p>
                     <div className="rounded-lg border border-primary/20 bg-background/80 px-3 py-2.5 text-sm text-muted-foreground">
                       <span className="font-medium text-foreground">{parsedUploadedImages.length}</span> φωτογραφίες ×{" "}
                       <span className="font-medium text-foreground">
@@ -1370,18 +1685,14 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
                 ) : null}
               </div>
 
-              <div className="rounded-2xl border border-border/45 bg-gradient-to-b from-muted/25 to-background/90 p-5 sm:p-7">
+              <div className="rounded-xl border border-border/45 bg-background p-5 sm:p-6">
                 <div className="mb-4 flex items-center gap-2.5 text-sm font-medium text-foreground">
                   <MapPin className="size-4 text-muted-foreground" aria-hidden />
                   Διεύθυνση ακινήτου
                 </div>
-                <p className="mb-6 text-[13px] leading-relaxed text-muted-foreground">
-                  Δήλωσε τη διεύθυνση και διάλεξε αν θέλεις να εμφανίζεται ακριβώς ή περίπου στο κοινό.
-                </p>
                 <Field
                   id="listing-address-line"
                   label="Διεύθυνση"
-                  hint="Π.χ. Ερμού 14, Σύνταγμα, Αθήνα"
                   className="mb-6"
                 >
                   <div className="relative">
@@ -1427,7 +1738,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
                       onBlur={() => {
                         window.setTimeout(() => setAddressSuggestionsOpen(false), 120);
                       }}
-                      placeholder="Οδός, αριθμός, περιοχή"
+                      placeholder="π.χ. Ερμού 14, Σύνταγμα"
                       required
                     />
                     {addressSuggestionsOpen &&
@@ -1509,10 +1820,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
                     onCenterChange={handleMapCenterChange}
                   />
                 </div>
-                <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">
-                  Αν χρειάζεται, προσαρμόζεις χειροκίνητα το σημείο με lat/lng (π.χ. από Google Maps δεξί κλικ → αντιγραφή
-                  συντεταγμένων).
-                </p>
+                <p className="mb-4 text-[13px] text-muted-foreground">Προαιρετικά: διόρθωσε χειροκίνητα τις συντεταγμένες.</p>
                 <div className="grid gap-6 sm:grid-cols-2">
                   <Field id="listing-lat" label="Πλάτος (lat)">
                     <Input
@@ -1539,6 +1847,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
                 </div>
               </div>
             </SectionShell>
+            ) : null}
 
             {error ? (
               <div
@@ -1550,120 +1859,98 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
             ) : null}
           </form>
 
-          {/* Column wrapper: full grid-row height so sticky isn’t clipped (overflow-x on ancestors breaks sticky) */}
           <div className="flex min-h-0 flex-col lg:h-full lg:min-h-0">
-          <aside className="flex min-h-0 flex-1 flex-col gap-6 overflow-visible">
-            <Card className="shrink-0 overflow-hidden rounded-2xl border-border/50 bg-card/90 shadow-sm ring-1 ring-border/25">
-              <div className="border-b border-border/40 bg-muted/15 px-5 py-4">
-                <div className="flex items-center gap-2.5 text-sm font-semibold text-foreground">
-                  <PenLine className="size-4 text-primary" aria-hidden />
-                  Προεπισκόπηση
-                </div>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">Έτσι θα φαίνεται περίπου στη λίστα.</p>
-              </div>
-              <div className="p-5 sm:p-6">
-                <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-muted shadow-inner ring-1 ring-border/40">
-                  {coverImageSrc ? (
-                    <Image
-                      src={coverImageSrc}
-                      alt=""
-                      fill
-                      className="object-cover"
-                      sizes="(max-width:1024px) 100vw, 340px"
-                      priority
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center px-4 text-center text-xs text-muted-foreground">
-                      Ανέβασε φωτογραφία για προεπισκόπηση εξώφυλλου
-                    </div>
-                  )}
-                  {coverImageSrc ? (
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-                  ) : null}
-                  <div className="absolute left-3 top-3">
-                    <span className="rounded-full border border-white/30 bg-black/45 px-2.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">
-                      {dealType === "sale" ? "Πώληση" : "Ενοικίαση"}
-                    </span>
-                  </div>
-                  <div className="absolute inset-x-0 bottom-0 p-3 text-white">
-                    <p className="line-clamp-2 text-sm font-semibold leading-snug drop-shadow-sm">
-                      {hasTitle ? title.trim() : "Ο τίτλος της αγγελίας σου"}
-                    </p>
-                    {previewSubtitle ? (
-                      <p className="mt-1 line-clamp-2 text-xs text-white/85 drop-shadow-sm">{previewSubtitle}</p>
-                    ) : (
-                      <p className="mt-1 text-xs italic text-white/60">Συμπλήρωσε εμβαδόν & δωμάτια για υπότιτλο</p>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-6 flex items-baseline justify-between gap-2 border-t border-border/40 pt-5">
-                  <span className="text-xl font-bold tabular-nums text-foreground">
-                    {hasPrice ? formatEur(parsedPrice!) : "— €"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{roomsLabel}</span>
-                </div>
-                {parsedSqm !== null ? (
-                  <p className="mt-1 text-xs text-muted-foreground">{parsedSqm} m²</p>
-                ) : (
-                  <p className="mt-1 text-xs italic text-muted-foreground">Πρόσθεσε m²</p>
-                )}
-                {previewHighlights.length > 0 ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {previewHighlights.map((h) => (
-                      <span
-                        key={h}
-                        className="rounded-full border border-border/60 bg-muted/80 px-2 py-0.5 text-[11px] font-medium text-foreground/90"
-                      >
-                        {h}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-4 text-[13px] text-muted-foreground">Διάλεξε χαρακτηριστικά για ετικέτες.</p>
-                )}
-              </div>
-            </Card>
-
-            <div className="flex w-full flex-col gap-6 lg:sticky lg:top-24 lg:z-10 lg:self-start">
+            <aside className="flex min-h-0 flex-1 flex-col gap-6 overflow-visible">
+              <div className="flex w-full flex-col gap-6 lg:sticky lg:top-24 lg:z-10 lg:self-start">
               <Card className="rounded-2xl border-border/50 bg-card/85 p-5 shadow-md ring-1 ring-border/30 sm:p-6">
-                <div className="mb-4 text-sm font-semibold text-foreground">
-                  {isEdit ? "Έλεγχος πριν την αποθήκευση" : "Έλεγχος πριν τη δημοσίευση"}
+                <div className="mb-5">
+                  <p className="text-sm font-semibold text-foreground">{isEdit ? "Πορεία επεξεργασίας" : "Πορεία καταχώρισης"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {completedStepsCount} από {totalSteps} βήματα ολοκληρωμένα
+                  </p>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted/70">
+                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(progressPercent, 6)}%` }} />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <CheckRow done={hasTitle} label="Τίτλος συμπληρωμένος" />
-                  <CheckRow done={hasPrice} label="Έγκυρη τιμή" />
-                  <CheckRow done={hasSqm} label="Εμβαδόν (m²)" />
-                  <CheckRow done={true} label="Δωμάτια επιλεγμένα" />
-                  <CheckRow done={hasHighlights} label="Τουλάχιστον ένα χαρακτηριστικό (προτείνεται)" />
+                <div className="space-y-3">
+                  {listingSteps.map((step, index) => (
+                    <div
+                      key={step.key}
+                      className={cn(
+                        "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border px-3 py-2",
+                        activeStepIndex === index ? "border-primary/35 bg-primary/[0.05]" : "border-border/45 bg-background/60"
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => goToStep(index)}
+                        className={cn(
+                          "min-w-0 text-left transition-colors",
+                          activeStepIndex === index ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <span className="flex items-start gap-2">
+                          <span className="mt-0.5 text-xs font-semibold text-muted-foreground">{index + 1}.</span>
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium">{step.shortTitle}</span>
+                          </span>
+                        </span>
+                      </button>
+                      <span
+                        className={cn(
+                          "inline-flex min-w-[104px] justify-center rounded-full border px-2.5 py-1 text-xs",
+                          step.done
+                            ? "border-primary/25 bg-primary/10 text-primary"
+                            : activeStepIndex === index
+                              ? "border-border/60 bg-background text-foreground"
+                              : "border-border/50 bg-muted/60 text-muted-foreground"
+                        )}
+                      >
+                        {step.done ? "Ολοκληρώθηκε" : activeStepIndex === index ? "Σε εξέλιξη" : "Εκκρεμεί"}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </Card>
 
-              <div className="flex gap-4 rounded-2xl border border-primary/20 bg-primary/[0.045] p-5 text-[15px] leading-relaxed text-foreground shadow-md ring-1 ring-primary/10 sm:p-6">
-                <Lightbulb className="mt-0.5 size-5 shrink-0 text-primary/90" aria-hidden />
-                <div>
-                  <p className="font-semibold text-foreground">Συμβουλή</p>
-                  <p className="mt-2 text-muted-foreground">
-                    Καλοί τίτλοι αναφέρουν περιοχή και τύπο ακινήτου. Στο υπότιτλο βάλε όροφο, κατάσταση ή απόσταση από μετρό.
-                  </p>
-                </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-12 rounded-xl px-4"
+                  onClick={goToPreviousStep}
+                  disabled={activeStepIndex === 0 || loading}
+                >
+                  Προηγούμενο
+                </Button>
+                {isLastStep ? (
+                  <Button
+                    form="listing-editor-form"
+                    type="submit"
+                    className="h-12 rounded-xl px-4"
+                    disabled={!canSubmit || loading}
+                  >
+                    {loading
+                      ? isEdit
+                        ? "Αποθήκευση…"
+                        : "Δημοσίευση…"
+                      : isEdit
+                        ? "Αποθήκευση αλλαγών"
+                        : "Δημοσίευση αγγελίας"}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    className="h-12 rounded-xl px-4"
+                    onClick={goToNextStep}
+                    disabled={loading || !canContinueCurrentStep}
+                  >
+                    Συνέχεια
+                  </Button>
+                )}
               </div>
-
-              <Button
-                form="listing-editor-form"
-                type="submit"
-                className="h-12 w-full rounded-xl px-6"
-                disabled={!canSubmit || loading}
-              >
-                {loading
-                  ? isEdit
-                    ? "Αποθήκευση…"
-                    : "Δημοσίευση…"
-                  : isEdit
-                    ? "Αποθήκευση αλλαγών"
-                    : "Δημοσίευση αγγελίας"}
-              </Button>
-            </div>
-          </aside>
+              </div>
+            </aside>
           </div>
         </div>
       </div>

@@ -2,13 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { type CSSProperties } from "react";
-import { Building2, ChevronRight, Heart, LayoutList, LogIn, Plus, User, UserRound } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { type CSSProperties, useState } from "react";
+import { Building2, ChevronRight, Heart, LayoutList, LogIn, LogOut, Plus, User, UserRound } from "lucide-react";
 
-import { useSessionUser } from "@/components/auth/use-session";
+import { notifyAuthChanged, useSessionUser } from "@/components/auth/use-session";
 import { useSavedListings } from "@/components/saved/use-saved";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,22 +22,37 @@ import { cn } from "@/lib/utils";
 import { ListingsNewEntryLink } from "@/components/layout/listings-new-entry-link";
 
 const accountMenuItemClass =
-  "flex w-full cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 text-[13px] outline-none transition-[background,color] duration-150 data-highlighted:bg-primary/[0.09] data-highlighted:text-foreground";
+  "flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 py-2.5 text-[13px] outline-none transition-[background,color] duration-150 data-highlighted:bg-primary/[0.09] data-highlighted:text-foreground";
 
 /** Παγκόσμιο sticky header — λογότυπο, αποθηκευμένα, λογαριασμός, καταχώρηση. */
 export function SiteHeader() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user } = useSessionUser();
   const saved = useSavedListings();
+  const [loggingOut, setLoggingOut] = useState(false);
   const savedCount = saved.ids.length;
   const burst = saved.favoriteAddBurst;
   const sparkAngles = [0, 45, 90, 135, 180, 225, 270, 315] as const;
   const sparkRadius = 16;
+  const showCreateListingCta = pathname !== "/listings/new";
+
+  async function onLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      notifyAuthChanged();
+      router.refresh();
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   return (
-    <header className="sticky top-0 z-[120] isolate h-16 shrink-0 border-b bg-background/88 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-between gap-2 px-3 sm:px-4">
-        <Link href="/" aria-label="Αρχική" className="shrink-0">
+    <header className="sticky top-0 z-[120] isolate h-16 shrink-0 border-b border-border/70 bg-white">
+      <div className="mx-auto flex h-full w-full max-w-[84rem] items-center justify-between gap-3 px-2 sm:px-4">
+        <Link href="/" aria-label="Αρχική" className="shrink-0 transition-opacity hover:opacity-95">
           <Image
             src="/logo.png"
             alt="Nestio"
@@ -48,13 +63,15 @@ export function SiteHeader() {
           />
         </Link>
 
-        <div className="flex items-center gap-1">
+        <div id="header-search-slot" className="hidden min-w-0 flex-1 px-3 xl:block" />
+
+        <div className="flex shrink-0 items-center gap-1">
           <Link
             href="/saved"
             aria-label={`Αποθηκευμένα (${savedCount})`}
             className={cn(
               buttonVariants({ variant: "secondary", size: "sm" }),
-              "h-9 gap-1.5 rounded-lg bg-background/80 px-2.5 shadow-none"
+              "h-9 gap-1.5 rounded-lg border border-border/55 bg-background/75 px-2.5 shadow-none ring-1 ring-transparent transition-colors hover:bg-muted/55 hover:ring-border/40"
             )}
           >
             <span className="relative inline-flex size-4 shrink-0 items-center justify-center">
@@ -107,7 +124,7 @@ export function SiteHeader() {
               aria-label={user ? `Λογαριασμός: ${user.name}` : "Μενού λογαριασμού"}
               className={cn(
                 buttonVariants({ variant: "secondary", size: "icon" }),
-                "size-9 rounded-lg bg-background/80 shadow-none outline-none focus-visible:ring-2 focus-visible:ring-primary/30 data-popup-open:bg-muted/60"
+                "size-9 rounded-lg border border-border/55 bg-background/75 shadow-none outline-none ring-1 ring-transparent transition-colors hover:bg-muted/55 hover:ring-border/40 focus-visible:ring-2 focus-visible:ring-primary/30 data-popup-open:bg-muted/60 data-popup-open:ring-border/50"
               )}
             >
               <User className={cn("size-4", user && "text-primary")} />
@@ -116,13 +133,14 @@ export function SiteHeader() {
               align="end"
               sideOffset={6}
               className={cn(
-                "min-w-[min(100vw-1.5rem,16.25rem)] overflow-hidden rounded-2xl border border-border/50 bg-popover/95 p-2",
-                "shadow-[0_12px_40px_-8px_rgba(0,0,0,0.18),0_4px_16px_-4px_rgba(0,0,0,0.08)]",
-                "ring-1 ring-black/[0.03] backdrop-blur-md dark:bg-popover/98 dark:ring-white/[0.06]"
+                "min-w-[min(100vw-1.5rem,16.25rem)] overflow-hidden rounded-2xl border border-border/60 bg-popover/95 p-2",
+                "shadow-[0_14px_36px_-10px_rgba(0,0,0,0.22),0_6px_18px_-8px_rgba(0,0,0,0.12)]",
+                "ring-1 ring-black/[0.04] backdrop-blur-md dark:bg-popover/98 dark:ring-white/[0.06]"
               )}
             >
               {user ? (
-                <DropdownMenuGroup>
+                <>
+                  <DropdownMenuGroup>
                   <DropdownMenuLabel className="mb-1 flex items-center gap-3 px-2 py-2">
                     <span
                       className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/50 bg-gradient-to-br from-primary/12 to-primary/[0.04] text-sm font-semibold text-primary"
@@ -151,7 +169,24 @@ export function SiteHeader() {
                       <ChevronRight className="size-4 shrink-0 text-muted-foreground/45" aria-hidden />
                     </DropdownMenuItem>
                   ) : null}
-                </DropdownMenuGroup>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator className="my-2 bg-gradient-to-r from-transparent via-border/80 to-transparent" />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      className={accountMenuItemClass}
+                      variant="destructive"
+                      disabled={loggingOut}
+                      onClick={() => void onLogout()}
+                    >
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                        <LogOut className="size-4" aria-hidden />
+                      </span>
+                      <span className="min-w-0 flex-1 font-medium">
+                        {loggingOut ? "Αποσύνδεση…" : "Αποσύνδεση"}
+                      </span>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </>
               ) : (
                 <>
                   <DropdownMenuGroup>
@@ -185,27 +220,31 @@ export function SiteHeader() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-          <ListingsNewEntryLink
-            aria-label="Προσθήκη αγγελίας"
-            title="Προσθήκη αγγελίας"
-            className={cn(
-              "inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-[transform,box-shadow] hover:bg-primary/92 active:scale-[0.97]",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-              "sm:hidden"
-            )}
-          >
-            <Plus className="size-[1.15rem]" strokeWidth={2.75} aria-hidden />
-          </ListingsNewEntryLink>
-          <ListingsNewEntryLink
-            className={cn(
-              buttonVariants({ variant: "default", size: "sm" }),
-              "h-9 rounded-lg px-3",
-              "hidden sm:inline-flex"
-            )}
-          >
-            <Plus className="size-4" />
-            Καταχώρηση
-          </ListingsNewEntryLink>
+          {showCreateListingCta ? (
+            <>
+              <ListingsNewEntryLink
+                aria-label="Προσθήκη αγγελίας"
+                title="Προσθήκη αγγελίας"
+                className={cn(
+                  "inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-[transform,box-shadow,background-color] hover:bg-primary/92 hover:shadow-md active:scale-[0.97]",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  "sm:hidden"
+                )}
+              >
+                <Plus className="size-[1.15rem]" strokeWidth={2.75} aria-hidden />
+              </ListingsNewEntryLink>
+              <ListingsNewEntryLink
+                className={cn(
+                  buttonVariants({ variant: "default", size: "sm" }),
+                  "h-9 rounded-lg px-3 shadow-sm transition-[transform,box-shadow] hover:shadow-md active:scale-[0.98]",
+                  "hidden sm:inline-flex"
+                )}
+              >
+                <Plus className="size-4" />
+                Καταχώρηση
+              </ListingsNewEntryLink>
+            </>
+          ) : null}
         </div>
       </div>
     </header>
