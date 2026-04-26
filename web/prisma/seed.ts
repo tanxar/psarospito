@@ -12,6 +12,11 @@ const gallery = [
   "/listings/photos/apt6.jpg",
 ] as const;
 
+const panoramaGallery = [
+  "/listings/photos/apt1.jpg",
+  "/listings/photos/apt2.jpg",
+] as const;
+
 const BROKER_SEEDS = [
   {
     email: "seed.nikos@nestio.demo",
@@ -48,6 +53,10 @@ const SEED_BROKER_REGIONS: readonly (readonly string[])[] = [
 ];
 
 const PROMOTED_BROKER_EMAIL = "seed.nikos@nestio.demo";
+const SEEKER_SEED = {
+  email: "seed.private@nestio.demo",
+  name: "Ιδιώτης Demo",
+} as const;
 
 const HIGHLIGHT_POOL = [
   "Κοντά στο μετρό",
@@ -117,6 +126,7 @@ function richHighlights(index: number): string[] {
 
 async function main() {
   const passwordHash = await hashPassword("seedbroker123");
+  const seekerPasswordHash = await hashPassword("seedseeker123");
 
   for (let i = 0; i < BROKER_SEEDS.length; i++) {
     const b = BROKER_SEEDS[i]!;
@@ -149,6 +159,27 @@ async function main() {
     });
   }
 
+  const seeker = await prisma.user.upsert({
+    where: { email: SEEKER_SEED.email },
+    create: {
+      email: SEEKER_SEED.email,
+      name: SEEKER_SEED.name,
+      role: "SEEKER",
+      passwordHash: seekerPasswordHash,
+      brokerOnboardingCompleted: false,
+    },
+    update: {
+      name: SEEKER_SEED.name,
+      role: "SEEKER",
+      passwordHash: seekerPasswordHash,
+      brokerOnboardingCompleted: false,
+      brokerCompanyName: null,
+      brokerPhone: null,
+      brokerServiceRegions: [],
+      brokerPromotionActiveUntil: null,
+    },
+  });
+
   const brokers = await prisma.user.findMany({
     where: { email: { in: [...BROKER_SEEDS.map((b) => b.email)] } },
   });
@@ -170,8 +201,12 @@ async function main() {
       const src = gallery[(idx + k) % gallery.length];
       return { src, sortOrder: k };
     });
+    const panoramas = Array.from({ length: 2 }, (_, k) => {
+      const src = panoramaGallery[(idx + k) % panoramaGallery.length];
+      return { src, sortOrder: k };
+    });
 
-    const owner = brokerOrder[i % brokerOrder.length]!;
+    const owner = i < 3 ? seeker : brokerOrder[i % brokerOrder.length]!;
 
     await prisma.listing.upsert({
       where: { id: l.id },
@@ -193,6 +228,10 @@ async function main() {
           deleteMany: {},
           create: images,
         },
+        panoramas: {
+          deleteMany: {},
+          create: panoramas,
+        },
       },
       create: {
         id: l.id,
@@ -212,6 +251,9 @@ async function main() {
         images: {
           create: images,
         },
+        panoramas: {
+          create: panoramas,
+        },
       },
     });
   }
@@ -220,6 +262,7 @@ async function main() {
   console.log(
     `Brokers (${brokerOrder.length}): ${brokerOrder.map((u) => u.email).join(", ")} — login password: seedbroker123`
   );
+  console.log(`Seeker: ${seeker.email} — login password: seedseeker123`);
 }
 
 main()

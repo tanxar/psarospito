@@ -7,12 +7,15 @@ import { ImageLightbox } from "@/components/media/image-lightbox";
 
 export function ListingGallery({
   images,
+  panoramas = [],
   alt,
 }: {
   images: string[];
+  panoramas?: string[];
   alt: string;
 }) {
   const items = useMemo(() => images.filter(Boolean), [images]);
+  const panoramaItems = useMemo(() => panoramas.filter(Boolean), [panoramas]);
   const [open, setOpen] = useState(false);
   const [idx, setIdx] = useState(0);
 
@@ -42,7 +45,15 @@ export function ListingGallery({
         </div>
       </div>
 
-      <ImageLightbox open={open} onOpenChange={setOpen} images={items} alt={alt} initialIndex={idx} />
+      <ImageLightbox
+        open={open}
+        onOpenChange={setOpen}
+        images={items}
+        alt={alt}
+        initialIndex={idx}
+        showPanoramaButton={panoramaItems.length > 0}
+        panoramaImages={panoramaItems}
+      />
     </>
   );
 }

@@ -44,7 +44,10 @@ export async function GET(req: Request) {
     const rows = await prisma.listing.findMany({
       where,
       orderBy,
-      include: { images: { orderBy: { sortOrder: "asc" } } },
+      include: {
+        images: { orderBy: { sortOrder: "asc" } },
+        panoramas: { orderBy: { sortOrder: "asc" } },
+      },
     });
 
     const multiGeo = parseListingGeoBBoxes(url.searchParams);
@@ -119,6 +122,7 @@ export async function POST(req: Request) {
           coverImageSrc?: unknown;
           dealType?: unknown;
           images?: unknown;
+          panoramaImages?: unknown;
           sourceImages?: unknown;
           generateAiRedesigns?: unknown;
           aiVariantsPerImage?: unknown;
@@ -163,6 +167,7 @@ export async function POST(req: Request) {
     const dealType = body.dealType === "sale" ? "sale" : "rent";
 
     const fallbackImages = parseImageList(body.images);
+    const panoramaImages = parseImageList(body.panoramaImages);
     const sourceImages = parseImageList(body.sourceImages);
     const uploadedImages = sourceImages.length > 0 ? sourceImages : fallbackImages;
     const generateAiRedesigns = body.generateAiRedesigns === true;
@@ -193,6 +198,7 @@ export async function POST(req: Request) {
 
     const allListingImages = [...new Set([...uploadedImages, ...generatedImages])].slice(0, MAX_LISTING_IMAGES);
     const imageRows = allListingImages.map((src, index) => ({ src, sortOrder: index }));
+    const panoramaRows = [...new Set(panoramaImages)].slice(0, MAX_LISTING_IMAGES).map((src, index) => ({ src, sortOrder: index }));
 
     const id = await allocateUniqueListingId(prisma);
 
@@ -218,6 +224,13 @@ export async function POST(req: Request) {
           ? {
               images: {
                 create: imageRows,
+              },
+            }
+          : {}),
+        ...(panoramaRows.length > 0
+          ? {
+              panoramas: {
+                create: panoramaRows,
               },
             }
           : {}),

@@ -429,7 +429,7 @@ export function ListingViewingBooking({
       }
       if (!res.ok) throw new Error(msg);
       setModalOpen(false);
-      setDone("Το αίτημα στάλθηκε. Θα ενημερωθείς όταν ο υπεύθυνος το επιβεβαιώσει.");
+      setDone("Το αίτημα επίσκεψης στάλθηκε. Θα ενημερωθείς μόλις ο υπεύθυνος το επιβεβαιώσει.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Αποτυχία");
     } finally {
@@ -456,7 +456,7 @@ export function ListingViewingBooking({
           <BrokerPhoneReveal phone={brokerPhone} visible={phoneVisible} onShow={() => setPhoneVisible(true)} />
         ) : null}
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Συνδέσου για να ζητήσεις ραντεβού παρουσίας με τον υπεύθυνο της αγγελίας.
+          Συνδέσου για να ζητήσεις ραντεβού επίσκεψης με τον υπεύθυνο της αγγελίας.
         </p>
         <Link
           href={`/auth/email?next=${encodeURIComponent(`/listing/${listingId}`)}`}
@@ -472,20 +472,25 @@ export function ListingViewingBooking({
   }
 
   if (user.id === ownerUserId) {
+    const ownerInfoText =
+      user.role === "BROKER"
+        ? "Διαχειρίσου τα ραντεβού της αγγελίας από το παρακάτω κουμπί."
+        : "Οι αιτήσεις ραντεβού για αυτή την αγγελία εμφανίζονται στον λογαριασμό σου.";
+    const ownerButtonText = user.role === "BROKER" ? "Διαχείριση ραντεβού" : "Τα ραντεβού μου";
     return (
       <div className="space-y-2">
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Οι αιτήσεις ραντεβού για αυτή την αγγελία εμφανίζονται στον λογαριασμό σου.
+          {ownerInfoText}
         </p>
         <Link
           href="/account/viewings"
           className={cn(
             buttonVariants({ variant: "secondary" }),
-            "inline-flex h-10 items-center gap-2 rounded-xl border-border/50 bg-background"
+            "inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border-border/50 bg-background"
           )}
         >
           <CalendarClock className="size-4" aria-hidden />
-          Τα ραντεβού μου
+          {ownerButtonText}
         </Link>
       </div>
     );
@@ -540,12 +545,6 @@ export function ListingViewingBooking({
         onContinue={submitVisit}
       />
 
-      <Link
-        href="/account/viewings"
-        className="block rounded-lg py-2 text-center text-xs font-medium text-primary underline-offset-4 transition-colors hover:bg-primary/[0.06] hover:underline"
-      >
-        Βλέπω τα ραντεβού μου
-      </Link>
     </div>
   );
 }

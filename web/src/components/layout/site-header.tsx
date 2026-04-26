@@ -3,8 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type CSSProperties, useState } from "react";
-import { Building2, ChevronRight, Heart, LayoutList, LogIn, LogOut, Plus, User, UserRound } from "lucide-react";
+import { type CSSProperties, useEffect, useState } from "react";
+import { BellDot, Building2, ChevronRight, Heart, LayoutList, LogIn, LogOut, Plus, User, UserRound } from "lucide-react";
 
 import { notifyAuthChanged, useSessionUser } from "@/components/auth/use-session";
 import { useSavedListings } from "@/components/saved/use-saved";
@@ -31,6 +31,9 @@ export function SiteHeader() {
   const { user } = useSessionUser();
   const saved = useSavedListings();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [hasInboxDot, setHasInboxDot] = useState(false);
+  const [inboxCount, setInboxCount] = useState(0);
+  const [inboxHref, setInboxHref] = useState("/account");
   const savedCount = saved.ids.length;
   const burst = saved.favoriteAddBurst;
   const sparkAngles = [0, 45, 90, 135, 180, 225, 270, 315] as const;
@@ -48,6 +51,96 @@ export function SiteHeader() {
       setLoggingOut(false);
     }
   }
+
+  useEffect(() => {
+    if (!user) {
+      setHasInboxDot(false);
+      setInboxCount(0);
+      setInboxHref("/account");
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        let totalPending = 0;
+        let pendingHostCount = 0;
+        let pendingSeekerCount = 0;
+        let incomingPriceCount = 0;
+        let incomingAssignmentCount = 0;
+        let incomingBrokerOfferCount = 0;
+
+        const apRes = await fetch("/api/appointments", { cache: "no-store" });
+        if (apRes.ok) {
+          const j = (await apRes.json()) as {
+            asSeeker?: Array<{ status?: string }>;
+            asHost?: Array<{ status?: string }>;
+          };
+          pendingHostCount = Array.isArray(j.asHost) ? j.asHost.filter((a) => a?.status === "PENDING").length : 0;
+          pendingSeekerCount = Array.isArray(j.asSeeker) ? j.asSeeker.filter((a) => a?.status === "PENDING").length : 0;
+          totalPending += pendingHostCount + pendingSeekerCount;
+        }
+
+        const priceRes = await fetch("/api/listings/incoming-price-offers", { cache: "no-store" });
+        if (priceRes.ok) {
+          const arr = (await priceRes.json()) as unknown;
+          incomingPriceCount = Array.isArray(arr) ? arr.length : 0;
+          totalPending += incomingPriceCount;
+        }
+
+        if (user.role === "BROKER") {
+          const incomingReqRes = await fetch("/api/brokers/incoming-assignment-requests", { cache: "no-store" });
+          if (incomingReqRes.ok) {
+            const arr = (await incomingReqRes.json()) as unknown;
+            incomingAssignmentCount = Array.isArray(arr) ? arr.length : 0;
+            totalPending += incomingAssignmentCount;
+          }
+        }
+
+        if (user.role === "SEEKER") {
+          const incomingBrokerRes = await fetch("/api/listings/incoming-broker-offers", { cache: "no-store" });
+          if (incomingBrokerRes.ok) {
+            const arr = (await incomingBrokerRes.json()) as unknown;
+            incomingBrokerOfferCount = Array.isArray(arr) ? arr.length : 0;
+            totalPending += incomingBrokerOfferCount;
+          }
+        }
+
+        if (!cancelled) {
+          const nextInboxHref =
+            user.role === "BROKER"
+              ? incomingAssignmentCount > 0
+                ? "/account/assignment-requests"
+                : incomingPriceCount > 0
+                  ? "/account/incoming-price-offers"
+                  : pendingHostCount + pendingSeekerCount > 0
+                    ? "/account/viewings"
+                    : "/account"
+              : incomingBrokerOfferCount > 0
+                ? "/account/incoming-broker-offers"
+                : incomingPriceCount > 0
+                  ? "/account/incoming-price-offers"
+                  : pendingHostCount + pendingSeekerCount > 0
+                    ? "/account/viewings"
+                    : "/account";
+          setInboxCount(totalPending);
+          setHasInboxDot(totalPending > 0);
+          setInboxHref(nextInboxHref);
+        }
+      } catch {
+        if (!cancelled) {
+          setInboxCount(0);
+          setHasInboxDot(false);
+          setInboxHref("/account");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, pathname]);
 
   return (
     <header className="sticky top-0 z-[120] isolate h-16 shrink-0 border-b border-border/70 bg-white">
@@ -124,10 +217,13 @@ export function SiteHeader() {
               aria-label={user ? `Λογαριασμός: ${user.name}` : "Μενού λογαριασμού"}
               className={cn(
                 buttonVariants({ variant: "secondary", size: "icon" }),
-                "size-9 rounded-lg border border-border/55 bg-background/75 shadow-none outline-none ring-1 ring-transparent transition-colors hover:bg-muted/55 hover:ring-border/40 focus-visible:ring-2 focus-visible:ring-primary/30 data-popup-open:bg-muted/60 data-popup-open:ring-border/50"
+                "relative size-9 rounded-lg border border-border/55 bg-background/75 shadow-none outline-none ring-1 ring-transparent transition-colors hover:bg-muted/55 hover:ring-border/40 focus-visible:ring-2 focus-visible:ring-primary/30 data-popup-open:bg-muted/60 data-popup-open:ring-border/50"
               )}
             >
               <User className={cn("size-4", user && "text-primary")} />
+              {hasInboxDot ? (
+                <span className="absolute right-1 top-1 size-2 rounded-full bg-red-500 ring-2 ring-background" aria-hidden />
+              ) : null}
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
@@ -153,6 +249,18 @@ export function SiteHeader() {
                       <span className="mt-0.5 block truncate text-xs text-muted-foreground">{user.email}</span>
                     </span>
                   </DropdownMenuLabel>
+                  <DropdownMenuItem className={accountMenuItemClass} onClick={() => router.push(inboxHref)}>
+                    <span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/70 text-muted-foreground">
+                      <BellDot className="size-4" aria-hidden />
+                      {inboxCount > 0 ? (
+                        <span className="absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-4 text-white">
+                          {inboxCount > 99 ? "99+" : inboxCount}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="min-w-0 flex-1 font-medium">Εισερχόμενα</span>
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground/45" aria-hidden />
+                  </DropdownMenuItem>
                   <DropdownMenuItem className={accountMenuItemClass} onClick={() => router.push("/account")}>
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/70 text-muted-foreground">
                       <UserRound className="size-4" aria-hidden />

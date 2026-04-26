@@ -24,6 +24,19 @@ enum ListingResolvedOutcome {
   SOLD
 }
 
+enum ListingBrokerOfferStatus {
+  PENDING
+  BROKER_ACCEPTED
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum ListingBrokerOfferDirection {
+  BROKER_TO_OWNER
+  OWNER_TO_BROKER
+}
+
 model User {
   id                          String          @id @default(uuid())
   email                       String          @unique
@@ -41,6 +54,10 @@ model User {
   updatedAt                   DateTime        @updatedAt
   oauthAccounts               OAuthAccount[]
   listingsOwned               Listing[]       @relation("ListingOwner")
+  brokerOffersSent            ListingBrokerOffer[] @relation("BrokerOffersSent")
+  brokerOffersReceived        ListingBrokerOffer[] @relation("BrokerOffersReceived")
+  priceOffersSent             ListingPriceOffer[]  @relation("PriceOffersSent")
+  priceOffersReceived         ListingPriceOffer[]  @relation("PriceOffersReceived")
   viewingAsSeeker             ViewingAppointment[] @relation("AppointmentSeeker")
   viewingAsHost               ViewingAppointment[] @relation("AppointmentHost")
 }
@@ -80,12 +97,66 @@ model Listing {
   owner         User?          @relation("ListingOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
 
   images         ListingImage[]
+  panoramas      ListingPanorama[]
+  brokerOffers   ListingBrokerOffer[]
+  priceOffers    ListingPriceOffer[]
   appointments   ViewingAppointment[]
 
   @@index([isActive])
   @@index([priceEur])
   @@index([dealType])
   @@index([ownerUserId])
+}
+
+model ListingPanorama {
+  id        String   @id @default(uuid())
+  listingId String
+  src       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+}
+
+model ListingPriceOffer {
+  id           String   @id @default(uuid())
+  listingId    String
+  listing      Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  seekerUserId String
+  seeker       User     @relation("PriceOffersSent", fields: [seekerUserId], references: [id], onDelete: Cascade)
+  ownerUserId  String
+  owner        User     @relation("PriceOffersReceived", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  amountEur    Int
+  basePriceEur Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([listingId])
+  @@index([seekerUserId])
+  @@index([ownerUserId, createdAt])
+}
+
+model ListingBrokerOffer {
+  id            String                   @id @default(uuid())
+  listingId     String
+  listing       Listing                  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  brokerUserId  String
+  broker        User                     @relation("BrokerOffersSent", fields: [brokerUserId], references: [id], onDelete: Cascade)
+  ownerUserId   String
+  owner         User                     @relation("BrokerOffersReceived", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  message       String?
+  direction     ListingBrokerOfferDirection @default(BROKER_TO_OWNER)
+  status        ListingBrokerOfferStatus @default(PENDING)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  respondedAt   DateTime?
+
+  @@index([listingId])
+  @@index([brokerUserId])
+  @@index([ownerUserId, status])
+  @@index([listingId, status])
 }
 
 model ViewingAppointment {

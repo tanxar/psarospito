@@ -239,6 +239,12 @@ type UploadedPhoto = {
   name: string;
 };
 
+type UploadedPanorama = {
+  id: string;
+  src: string;
+  name: string;
+};
+
 type AddressSuggestion = {
   label: string;
   lat: number;
@@ -253,6 +259,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
   const { user, ready } = useSessionUser();
   const isEdit = Boolean(listingId);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const panoramaFileInputRef = useRef<HTMLInputElement | null>(null);
   const geocodeDebounceRef = useRef<number | null>(null);
   const geocodeAbortRef = useRef<AbortController | null>(null);
   const reverseGeocodeAbortRef = useRef<AbortController | null>(null);
@@ -300,6 +307,9 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
+  const [uploadedPanoramas, setUploadedPanoramas] = useState<UploadedPanorama[]>([]);
+  const [uploadingPanoramas, setUploadingPanoramas] = useState(false);
+  const [uploadingPanoramaCount, setUploadingPanoramaCount] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [draggingPhotoId, setDraggingPhotoId] = useState<string | null>(null);
   const [dragOverPhotoId, setDragOverPhotoId] = useState<string | null>(null);
@@ -349,6 +359,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
           highlights: string[];
           imageSrc: string;
           images?: string[];
+          panoramaImages?: string[];
           dealType?: "rent" | "sale";
           addressLine?: string;
           locationPrecision?: "exact" | "approximate";
@@ -388,6 +399,14 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
             id: `existing-${i}-${src.slice(-24)}`,
             src,
             name: "photo",
+          }))
+        );
+        const panoramaUrls = [...new Set((data.panoramaImages ?? []).filter(Boolean))];
+        setUploadedPanoramas(
+          panoramaUrls.map((src, i) => ({
+            id: `existing-panorama-${i}-${src.slice(-24)}`,
+            src,
+            name: "panorama",
           }))
         );
 
@@ -469,6 +488,9 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
   const parsedUploadedImages = useMemo(() => {
     return uploadedPhotos.map((photo) => photo.src);
   }, [uploadedPhotos]);
+  const parsedUploadedPanoramas = useMemo(() => {
+    return uploadedPanoramas.map((photo) => photo.src);
+  }, [uploadedPanoramas]);
   const parsedAiVariants = useMemo(() => {
     const n = Number(aiVariantsPerImage);
     return Number.isFinite(n) ? Math.floor(n) : NaN;
@@ -691,15 +713,20 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
     });
   }
 
-  async function uploadPhotos(filesInput: FileList | File[]) {
+  async function uploadMedia(filesInput: FileList | File[], kind: "photos" | "panoramas") {
     const files = Array.from(filesInput).filter((file) => file.type.startsWith("image/"));
     if (files.length === 0) {
       setError("Διάλεξε αρχεία εικόνας (jpg/png/webp).");
       return;
     }
 
-    setUploadingPhotos(true);
-    setUploadingCount(files.length);
+    if (kind === "photos") {
+      setUploadingPhotos(true);
+      setUploadingCount(files.length);
+    } else {
+      setUploadingPanoramas(true);
+      setUploadingPanoramaCount(files.length);
+    }
     setError(null);
 
     try {
@@ -724,7 +751,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
             id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
             src: file.url,
             name: file.name ?? "photo",
-          } satisfies UploadedPhoto;
+          };
         })
         .filter((x): x is UploadedPhoto => x != null);
 
@@ -732,24 +759,41 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
         throw new Error("Δεν επιστράφηκαν έγκυρες φωτογραφίες από το upload.");
       }
 
-      setUploadedPhotos((prev) => {
-        const seen = new Set(prev.map((p) => p.src));
-        const next = [...prev];
-        for (const photo of uploaded) {
-          if (seen.has(photo.src)) continue;
-          seen.add(photo.src);
-          next.push(photo);
-        }
-        return next;
-      });
+      if (kind === "photos") {
+        setUploadedPhotos((prev) => {
+          const seen = new Set(prev.map((p) => p.src));
+          const next = [...prev];
+          for (const photo of uploaded) {
+            if (seen.has(photo.src)) continue;
+            seen.add(photo.src);
+            next.push(photo);
+          }
+          return next;
+        });
+      } else {
+        setUploadedPanoramas((prev) => {
+          const seen = new Set(prev.map((p) => p.src));
+          const next = [...prev];
+          for (const photo of uploaded) {
+            if (seen.has(photo.src)) continue;
+            seen.add(photo.src);
+            next.push(photo);
+          }
+          return next;
+        });
+      }
 
     } catch (err) {
       setError(err instanceof Error ? err.message : "Αποτυχία upload");
     } finally {
-      setUploadingPhotos(false);
-      setUploadingCount(0);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+      if (kind === "photos") {
+        setUploadingPhotos(false);
+        setUploadingCount(0);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      } else {
+        setUploadingPanoramas(false);
+        setUploadingPanoramaCount(0);
+        if (panoramaFileInputRef.current) panoramaFileInputRef.current.value = "";
       }
     }
   }
@@ -757,7 +801,13 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
   function onFilesSelected(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    void uploadPhotos(files);
+    void uploadMedia(files, "photos");
+  }
+
+  function onPanoramaFilesSelected(e: ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    void uploadMedia(files, "panoramas");
   }
 
   function onDropFiles(e: DragEvent<HTMLDivElement>) {
@@ -765,11 +815,15 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
     setDragActive(false);
     const files = e.dataTransfer.files;
     if (!files || files.length === 0) return;
-    void uploadPhotos(files);
+    void uploadMedia(files, "photos");
   }
 
   function removePhoto(photo: UploadedPhoto) {
     setUploadedPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+  }
+
+  function removePanorama(photo: UploadedPanorama) {
+    setUploadedPanoramas((prev) => prev.filter((p) => p.id !== photo.id));
   }
 
   function onPhotoDragStart(photoId: string) {
@@ -808,7 +862,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
 
   const canSubmit = useMemo(() => {
     if (isEdit && editLoadState !== "ready") return false;
-    if (uploadingPhotos) return false;
+    if (uploadingPhotos || uploadingPanoramas) return false;
     if (!isEdit && (!hasCategory || !hasPropertyType)) return false;
     if (!addressLine.trim()) return false;
     const p = Number(priceEur.replace(/\s/g, "").replace(",", "."));
@@ -828,6 +882,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
     isEdit,
     editLoadState,
     uploadingPhotos,
+    uploadingPanoramas,
     hasCategory,
     hasPropertyType,
     addressLine,
@@ -909,6 +964,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
             dealType,
             sourceImages: parsedUploadedImages,
             images: parsedUploadedImages,
+            panoramaImages: parsedUploadedPanoramas,
             generateAiRedesigns,
             aiVariantsPerImage: parsedAiVariants,
           }),
@@ -949,6 +1005,7 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
           dealType,
           sourceImages: parsedUploadedImages,
           images: parsedUploadedImages,
+          panoramaImages: parsedUploadedPanoramas,
           generateAiRedesigns,
           aiVariantsPerImage: parsedAiVariants,
         }),
@@ -1638,6 +1695,72 @@ function ListingEditorPage({ listingId }: { listingId?: string } = {}) {
                     Γίνεται μεταφόρτωση εικόνων...
                   </div>
                 ) : null}
+
+                <div className="mt-6 rounded-xl border border-border/45 bg-background p-4 sm:p-5">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-foreground">360° Πανοραμικές εικόνες (προαιρετικό)</p>
+                    <span className="text-xs text-muted-foreground">{uploadedPanoramas.length} αρχεία</span>
+                  </div>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => panoramaFileInputRef.current?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        panoramaFileInputRef.current?.click();
+                      }
+                    }}
+                    className={cn(
+                      "rounded-xl border-2 border-dashed bg-background px-4 py-5 text-center transition-colors",
+                      uploadingPanoramas ? "cursor-progress border-primary/40 bg-primary/[0.04]" : "border-border/60 hover:border-primary/50"
+                    )}
+                    aria-label="Μεταφόρτωση 360 εικόνων"
+                  >
+                    {uploadingPanoramas ? (
+                      <div className="flex flex-col items-center justify-center gap-2 text-foreground">
+                        <Loader2 className="size-6 animate-spin text-primary" aria-hidden />
+                        <p className="text-sm font-medium">Μεταφόρτωση {uploadingPanoramaCount} πανοραμικών...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <UploadCloud className="mx-auto mb-1.5 size-6 text-muted-foreground" aria-hidden />
+                        <p className="text-sm font-medium text-foreground">Πάτησε για upload 360° εικόνων</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Προτείνεται format 2:1 (π.χ. 6000x3000)</p>
+                      </>
+                    )}
+                    <input
+                      ref={panoramaFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={onPanoramaFilesSelected}
+                    />
+                  </div>
+                  {uploadedPanoramas.length > 0 ? (
+                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {uploadedPanoramas.map((photo) => (
+                        <div key={photo.id} className="group relative overflow-hidden rounded-xl border border-border/50 bg-background">
+                          <div className="relative aspect-[4/3]">
+                            <Image src={photo.src} alt={photo.name} fill className="object-cover" sizes="(max-width:640px) 50vw, 180px" />
+                          </div>
+                          <span className="absolute left-1.5 top-1.5 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-semibold text-white">
+                            360°
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removePanorama(photo)}
+                            className="absolute right-1.5 top-1.5 inline-flex size-7 items-center justify-center rounded-full bg-black/65 text-white opacity-90 transition hover:opacity-100"
+                            aria-label="Διαγραφή 360 εικόνας"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
 
                 <div className="mt-5 rounded-xl border border-border/45 bg-muted/15 px-4 py-4 sm:px-5">
                   <div className="flex gap-3">

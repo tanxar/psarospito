@@ -107,6 +107,7 @@ export function HomeSearchToolbar({
   listingMode,
   onListingModeChange,
   onClearFilter,
+  compact = false,
 }: {
   query: string;
   onQueryChange: (value: string) => void;
@@ -119,6 +120,7 @@ export function HomeSearchToolbar({
   listingMode: "rent" | "sale";
   onListingModeChange: (mode: "rent" | "sale") => void;
   onClearFilter?: (key: keyof Filters | "features" | "location") => void;
+  compact?: boolean;
 }) {
   const listId = useId();
   /** Πεδίο + floating panel — κλικ έξω κλείνει το overlay. */
@@ -258,15 +260,27 @@ export function HomeSearchToolbar({
 
   return (
     <div>
-      <div className="mx-auto w-full max-w-6xl px-2.5 py-2.5 sm:px-4 sm:py-3">
-        <div className="space-y-3">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] gap-x-2 gap-y-3 overflow-visible rounded-2xl border border-border/60 bg-card/75 p-2.5 shadow-sm backdrop-blur sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-rows-1 sm:items-start sm:gap-2 sm:p-2">
-            <div className="col-start-1 row-start-1 inline-flex shrink-0 items-center justify-self-start rounded-xl border border-border/60 bg-background/80 p-1 sm:col-start-1">
+      <div className={cn(!compact && "mx-auto w-full max-w-6xl px-2 py-2 sm:px-4 sm:py-2.5")}>
+        <div className={cn("space-y-2", compact && "space-y-0")}>
+          <div
+            className={cn(
+              "grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] gap-x-2 gap-y-2 overflow-visible rounded-xl border p-2 shadow-sm backdrop-blur sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-rows-1 sm:items-start sm:gap-2 sm:p-1.5",
+              compact
+                ? "border-border/45 bg-background/55 shadow-none"
+                : "border-border/60 bg-card/75"
+            )}
+          >
+            <div
+              className={cn(
+                "col-start-1 row-start-1 inline-flex shrink-0 items-center justify-self-start rounded-lg border p-0.5 sm:col-start-1",
+                compact ? "border-border/45 bg-background/60" : "border-border/60 bg-background/80"
+              )}
+            >
               <button
                 type="button"
                 onClick={() => onListingModeChange("rent")}
                 className={cn(
-                  "h-10 min-h-10 rounded-lg px-3.5 text-sm font-medium transition-colors sm:h-8 sm:min-h-0 sm:px-3",
+                  "h-9 min-h-9 rounded-md px-3 text-sm font-medium transition-colors sm:h-8 sm:min-h-0 sm:px-2.5",
                   listingMode === "rent" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
                 )}
                 aria-pressed={listingMode === "rent"}
@@ -277,7 +291,7 @@ export function HomeSearchToolbar({
                 type="button"
                 onClick={() => onListingModeChange("sale")}
                 className={cn(
-                  "h-10 min-h-10 rounded-lg px-3.5 text-sm font-medium transition-colors sm:h-8 sm:min-h-0 sm:px-3",
+                  "h-9 min-h-9 rounded-md px-3 text-sm font-medium transition-colors sm:h-8 sm:min-h-0 sm:px-2.5",
                   listingMode === "sale" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
                 )}
                 aria-pressed={listingMode === "sale"}
@@ -290,21 +304,31 @@ export function HomeSearchToolbar({
               ref={locationColumnRef}
               className="relative z-[120] col-span-full row-start-2 min-w-0 overflow-visible sm:col-span-1 sm:col-start-2 sm:row-start-1"
             >
-              <div className="max-h-[8.5rem] overflow-y-auto overflow-x-hidden rounded-xl border border-border/60 bg-background/80 px-2.5 py-2.5 [scrollbar-width:thin] sm:max-h-[7.5rem] sm:px-2 sm:py-2">
-                <div className="flex flex-wrap items-center gap-2 sm:gap-1.5">
+              <div
+                className={cn(
+                  "rounded-lg border px-2 py-2 [scrollbar-width:thin] sm:px-2 sm:py-1.5",
+                  compact
+                    ? "h-10 overflow-x-auto overflow-y-hidden border-border/45 bg-background/60"
+                    : "max-h-[7.25rem] overflow-y-auto overflow-x-hidden border-border/60 bg-background/80 sm:max-h-[6.25rem]"
+                )}
+              >
+                <div className={cn("flex items-center gap-1.5", compact ? "flex-nowrap" : "flex-wrap sm:gap-1.5")}>
                   {selectedAreas.map((a) => (
                     <span
                       key={a.id}
-                      className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/50 bg-muted/60 py-1 pl-3 pr-1 text-sm font-medium text-foreground sm:py-0.5 sm:pl-2.5 sm:text-[13px]"
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted/60 py-0.5 pl-2.5 pr-1 text-[13px] font-medium text-foreground",
+                        compact ? "max-w-[8.75rem] shrink-0" : "max-w-full"
+                      )}
                     >
                       <span className="truncate">{a.chipLabel}</span>
                       <button
                         type="button"
-                        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground active:bg-background active:text-foreground sm:size-6 sm:hover:bg-background sm:hover:text-foreground"
+                        className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground active:bg-background active:text-foreground sm:hover:bg-background sm:hover:text-foreground"
                         aria-label={`Αφαίρεση ${a.chipLabel}`}
                         onClick={() => onRemoveArea(a.id)}
                       >
-                        <X className="size-4 sm:size-3.5" />
+                        <X className="size-3.5" />
                       </button>
                     </span>
                   ))}
@@ -355,14 +379,17 @@ export function HomeSearchToolbar({
                     aria-expanded={showFloatingPanel}
                     aria-controls={showFloatingPanel ? listId : undefined}
                     aria-autocomplete="list"
-                    className="min-h-11 min-w-0 flex-1 border-0 bg-transparent px-1 text-base outline-none ring-0 placeholder:text-muted-foreground focus-visible:ring-0 sm:h-8 sm:min-h-0 sm:min-w-[10rem] sm:text-sm"
+                    className={cn(
+                      "min-h-9 min-w-0 flex-1 border-0 bg-transparent px-1 text-[15px] outline-none ring-0 placeholder:text-muted-foreground focus-visible:ring-0 sm:h-8 sm:min-h-0 sm:text-sm",
+                      compact ? "min-w-[8rem] sm:min-w-[8rem]" : "sm:min-w-[10rem]"
+                    )}
                     inputMode="search"
                     enterKeyHint="search"
                   />
-                  {selectedAreas.length > 0 ? (
+                  {selectedAreas.length > 0 && !compact ? (
                     <button
                       type="button"
-                      className="min-h-9 shrink-0 px-1 text-xs font-medium text-muted-foreground underline-offset-2 active:text-foreground sm:min-h-0 sm:hover:text-foreground sm:hover:underline"
+                      className="min-h-8 shrink-0 px-1 text-xs font-medium text-muted-foreground underline-offset-2 active:text-foreground sm:min-h-0 sm:hover:text-foreground sm:hover:underline"
                       onClick={() => {
                         onClearAreas();
                         onQueryChange("");
@@ -449,17 +476,17 @@ export function HomeSearchToolbar({
                 <SheetTrigger
                   className={cn(
                     buttonVariants({ variant: "secondary", size: "sm" }),
-                    "h-11 min-h-11 gap-2 rounded-xl px-3.5 sm:h-10 sm:min-h-0 sm:px-3"
+                    "h-9 min-h-9 gap-2 rounded-lg border border-primary/45 px-3 sm:h-9 sm:min-h-0 sm:px-2.5"
                   )}
-                  aria-label="Filters"
+                  aria-label="Φίλτρα"
                 >
                   <SlidersHorizontal className="size-[1.125rem] sm:size-4" />
-                  <span>Filters</span>
+                  <span>Φίλτρα</span>
                 </SheetTrigger>
                 <SheetContent side="right" className="flex w-full flex-col p-0 sm:max-w-md">
                   <SheetHeader className="border-b bg-background/80 backdrop-blur">
-                    <SheetTitle>Filters</SheetTitle>
-                    <SheetDescription>Refine results with a few clean controls.</SheetDescription>
+                    <SheetTitle>Φίλτρα</SheetTitle>
+                    <SheetDescription>Βελτίωσε τα αποτελέσματα με μερικές απλές επιλογές.</SheetDescription>
                   </SheetHeader>
                   <div className="flex-1 overflow-y-auto p-4">
                     <FiltersSheetBody filters={filters} onChange={onFiltersChange} />
@@ -471,10 +498,10 @@ export function HomeSearchToolbar({
                       className="h-11 w-full rounded-xl border border-border/60 bg-card/80 shadow-sm backdrop-blur hover:bg-card hover:shadow-md sm:w-auto"
                       onClick={() => onFiltersChange({})}
                     >
-                      Clear all
+                      Καθαρισμός όλων
                     </Button>
                     <SheetClose render={<Button className="h-11 w-full rounded-xl sm:w-auto" type="button" />}>
-                      Apply
+                      Εφαρμογή
                     </SheetClose>
                   </SheetFooter>
                 </SheetContent>
@@ -482,9 +509,11 @@ export function HomeSearchToolbar({
             </div>
           </div>
 
-          <div className="pt-0.5">
-            <AppliedFilters filters={filters} onClear={(k) => onClearFilter?.(k)} />
-          </div>
+          {!compact ? (
+            <div className="pt-0">
+              <AppliedFilters filters={filters} onClear={(k) => onClearFilter?.(k)} />
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

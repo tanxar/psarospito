@@ -126,7 +126,7 @@ export function ImageCarousel({
 
       <button
         type="button"
-        aria-label="Previous photo"
+        aria-label="Προηγούμενη φωτογραφία"
         data-carousel-control
         onClick={handleArrow(-1)}
         onPointerDown={(e) => {
@@ -144,7 +144,7 @@ export function ImageCarousel({
 
       <button
         type="button"
-        aria-label="Next photo"
+        aria-label="Επόμενη φωτογραφία"
         data-carousel-control
         onClick={handleArrow(1)}
         onPointerDown={(e) => {

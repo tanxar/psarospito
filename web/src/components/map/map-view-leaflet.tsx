@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { Circle, MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
 
@@ -81,7 +81,7 @@ function FitBoundsOrFocus({
       return;
     }
     const bounds = listings.map((l) => [l.location.lat, l.location.lng] as [number, number]);
-    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 });
+    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14, animate: false });
   }, [map, key, listings, locationPrecision, searchBboxes]);
 
   return null;
@@ -240,7 +240,8 @@ export function MapViewLeaflet({
   activeId,
   onSelect,
   className,
-  mapLabel = "Map",
+  mapLabel = "Χάρτης",
+  enableScrollWheelZoom = true,
   locationPrecision = "exact",
   searchBboxes,
 }: {
@@ -252,16 +253,36 @@ export function MapViewLeaflet({
   className?: string;
   /** Small badge top-left */
   mapLabel?: string | null;
+  /** Επιτρέπεται zoom με ροδέλα ποντικιού */
+  enableScrollWheelZoom?: boolean;
   /** Σελίδα αγγελίας: κύκλος περιοχής αντί για ακριβή καρφίτσα */
   locationPrecision?: "exact" | "approximate";
   /** Επιλεγμένες περιοχές αναζήτησης — το χάρτη κάνει zoom ώστε να χωράνε όλα τα bbox. */
   searchBboxes?: MapSearchBBox[];
 }) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [canMountLeaflet, setCanMountLeaflet] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
   }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const el = hostRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setCanMountLeaflet(rect.width > 0 && rect.height > 0);
+    };
+    update();
+
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mounted]);
 
   const center = useMemo(() => {
     if (!listings.length) return { lat: 37.98, lng: 23.73 };
@@ -287,8 +308,8 @@ export function MapViewLeaflet({
     <div
       className={cn("w-full overflow-hidden rounded-3xl border bg-card shadow-none", className)}
     >
-      <div className={["relative w-full", height].join(" ")}>
-        {mounted ? (
+      <div ref={hostRef} className={["relative w-full", height].join(" ")}>
+        {mounted && canMountLeaflet ? (
           <MapErrorBoundary
             fallback={
               <iframe
@@ -301,10 +322,9 @@ export function MapViewLeaflet({
             }
           >
             <MapContainer
-              key={`${listings.map((l) => l.id).join(",") || "leaflet-map"}-${locationPrecision}`}
               center={[center.lat, center.lng]}
               zoom={12}
-              scrollWheelZoom
+              scrollWheelZoom={enableScrollWheelZoom}
               zoomControl={false}
               className="absolute inset-0 bg-muted"
             >

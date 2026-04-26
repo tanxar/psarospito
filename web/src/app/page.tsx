@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import type { Filters } from "@/components/listings/types";
@@ -61,6 +62,7 @@ export default function Home() {
   const [retryToken, setRetryToken] = useState(0);
   /** «Χάρτης»: χάρτης + λίστα. «Αγγελίες»: πλήρες πλάτος, περισσότερες στήλες καρτών. */
   const [browseLayout, setBrowseLayout] = useState<"map" | "listings">("map");
+  const [headerSearchSlot, setHeaderSearchSlot] = useState<HTMLElement | null>(null);
 
   const listingsFilterQuery = useMemo(() => {
     const p = new URLSearchParams();
@@ -154,59 +156,73 @@ export default function Home() {
     return () => ac.abort();
   }, [listingsQueryString, retryToken]);
 
+  useEffect(() => {
+    setHeaderSearchSlot(document.getElementById("header-search-slot"));
+  }, []);
+
+  const toolbarProps = {
+    query,
+    onQueryChange: setQuery,
+    selectedAreas,
+    onAddArea: (s: LocationSuggestion) => {
+      setSelectedAreas((prev) => {
+        if (prev.some((a) => a.id === s.id) || prev.length >= 8) return prev;
+        return [
+          ...prev,
+          { id: s.id, chipLabel: chipLabelFromSuggestion(s), bbox: s.bbox },
+        ];
+      });
+    },
+    onRemoveArea: (id: string) =>
+      setSelectedAreas((prev) => prev.filter((a) => a.id !== id)),
+    onClearAreas: () => {
+      setSelectedAreas([]);
+      setQuery("");
+    },
+    filters,
+    onFiltersChange: setFilters,
+    listingMode,
+    onListingModeChange: setListingMode,
+    onClearFilter: (key: keyof Filters | "features" | "location") => {
+      setFilters((prev) => {
+        const next = { ...prev };
+        if (key === "features") {
+          delete next.parking;
+          delete next.balcony;
+          delete next.pets;
+          delete next.elevator;
+          delete next.renovated;
+          delete next.bright;
+          return next;
+        }
+        if (key === "location") {
+          delete next.nearMetro;
+          delete next.nearTram;
+          return next;
+        }
+        delete (next as Record<string, unknown>)[key];
+        return next;
+      });
+    },
+  } as const;
+
   return (
     <div className="flex flex-1 flex-col">
-      <div className="relative z-[110] isolate overflow-visible border-b bg-background/88 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:sticky sm:top-16">
-        <HomeSearchToolbar
-          query={query}
-          onQueryChange={setQuery}
-          selectedAreas={selectedAreas}
-          onAddArea={(s: LocationSuggestion) => {
-            setSelectedAreas((prev) => {
-              if (prev.some((a) => a.id === s.id) || prev.length >= 8) return prev;
-              return [
-                ...prev,
-                { id: s.id, chipLabel: chipLabelFromSuggestion(s), bbox: s.bbox },
-              ];
-            });
-          }}
-          onRemoveArea={(id) =>
-            setSelectedAreas((prev) => prev.filter((a) => a.id !== id))
-          }
-          onClearAreas={() => {
-            setSelectedAreas([]);
-            setQuery("");
-          }}
-          filters={filters}
-          onFiltersChange={setFilters}
-          listingMode={listingMode}
-          onListingModeChange={setListingMode}
-          onClearFilter={(key) => {
-            setFilters((prev) => {
-              const next = { ...prev };
-              if (key === "features") {
-                delete next.parking;
-                delete next.balcony;
-                delete next.pets;
-                delete next.elevator;
-                delete next.renovated;
-                delete next.bright;
-                return next;
-              }
-              if (key === "location") {
-                delete next.nearMetro;
-                delete next.nearTram;
-                return next;
-              }
-              delete (next as Record<string, unknown>)[key];
-              return next;
-            });
-          }}
-        />
+      {headerSearchSlot
+        ? createPortal(
+            <div className="mx-auto w-full max-w-[46rem] min-w-0">
+              <HomeSearchToolbar compact {...toolbarProps} />
+            </div>,
+            headerSearchSlot
+          )
+        : null}
+
+      <div className="relative z-[110] isolate overflow-visible border-b bg-background/88 backdrop-blur supports-[backdrop-filter]:bg-background/80 xl:hidden">
+        <HomeSearchToolbar {...toolbarProps} />
       </div>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-4 sm:px-4 sm:py-6">
-        <div className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0 rounded-xl border border-border/60 bg-card/60 px-3 py-2.5 shadow-sm sm:gap-x-3 sm:px-4">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-5 sm:px-4 sm:py-7">
+        <div className="mb-5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0 rounded-xl border border-border/60 bg-card/60 px-3 py-3 shadow-sm sm:gap-x-4 sm:px-4 sm:py-3.5">
           <div className="flex min-w-0 flex-nowrap items-center gap-2 sm:gap-3">
             <span className="shrink-0 text-sm text-muted-foreground">
               <span className={cn("font-semibold tabular-nums text-foreground", listingsLoading && "animate-pulse")}>
@@ -222,11 +238,11 @@ export default function Home() {
                 value={sort}
                 onValueChange={(v) => v != null && setSort(v as ListingSortParam)}
               >
-                <SelectTrigger
+              <SelectTrigger
                   id="listing-sort"
                   aria-label="Ταξινόμηση"
                   size="sm"
-                  className="h-9 w-full min-w-0 max-w-full truncate rounded-lg border-border/60 bg-background text-left shadow-sm sm:w-auto sm:max-w-[min(100vw-8rem,18rem)] sm:min-w-[14rem]"
+                  className="h-10 w-full min-w-0 max-w-full truncate rounded-lg border-border/60 bg-background text-left shadow-sm sm:w-auto sm:max-w-[min(100vw-8rem,18rem)] sm:min-w-[14rem]"
                 >
                   <SelectValue placeholder="Ταξινόμηση">
                     {(value) =>
@@ -256,7 +272,7 @@ export default function Home() {
                 type="button"
                 onClick={() => setBrowseLayout("map")}
                 className={cn(
-                  "h-9 rounded-md px-3 text-sm font-medium transition-colors",
+                  "h-9 rounded-md px-3.5 text-sm font-medium transition-colors",
                   browseLayout === "map"
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -269,7 +285,7 @@ export default function Home() {
                 type="button"
                 onClick={() => setBrowseLayout("listings")}
                 className={cn(
-                  "h-9 rounded-md px-3 text-sm font-medium transition-colors",
+                  "h-9 rounded-md px-3.5 text-sm font-medium transition-colors",
                   browseLayout === "listings"
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -284,17 +300,17 @@ export default function Home() {
 
         <div
           className={cn(
-            "grid gap-6 lg:gap-8",
+            "grid gap-7 lg:gap-9",
             browseLayout === "map"
               ? "lg:grid-cols-[minmax(0,560px)_minmax(0,1fr)]"
               : "lg:grid-cols-1"
           )}
         >
           {browseLayout === "map" ? (
-            <aside className="order-1 self-start lg:order-2 lg:col-start-2 lg:sticky lg:top-48">
+            <aside className="order-1 self-start lg:order-2 lg:col-start-2 lg:sticky lg:top-40">
               <MapViewLeaflet
                 listings={listings}
-                heightClassName="h-[44dvh] min-h-[320px] lg:h-[calc(100dvh-13rem)] lg:min-h-[560px]"
+                heightClassName="h-[48dvh] min-h-[360px] lg:h-[calc(100dvh-11.75rem)] lg:min-h-[620px]"
                 activeId={activeId}
                 onSelect={(id) => setActiveId(id)}
                 searchBboxes={selectedAreas.map((a) => a.bbox)}
@@ -304,7 +320,7 @@ export default function Home() {
 
           <section
             className={cn(
-              "order-2 space-y-3 lg:order-1",
+              "order-2 space-y-4 lg:order-1",
               browseLayout === "map" && "lg:col-start-1"
             )}
           >
@@ -326,7 +342,7 @@ export default function Home() {
                 </Button>
               </div>
             ) : listingsLoading ? (
-              <div className="space-y-3">
+              <div className="space-y-3.5">
                 {[0, 1, 2].map((k) => (
                   <div
                     key={k}
@@ -344,8 +360,8 @@ export default function Home() {
               <div
                 className={cn(
                   browseLayout === "listings"
-                    ? "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
-                    : "space-y-3"
+                    ? "grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3"
+                    : "space-y-3.5"
                 )}
               >
                 {listings.map((l) => (
@@ -362,7 +378,7 @@ export default function Home() {
               </div>
             )}
             {!listingsLoading && !listingsError && totalCount > 0 && totalPages > 1 ? (
-              <div className="flex flex-col items-stretch justify-between gap-4 rounded-xl border border-border/50 bg-card/50 px-4 py-4 sm:flex-row sm:items-center sm:px-5">
+              <div className="flex flex-col items-stretch justify-between gap-4 rounded-xl border border-border/50 bg-card/50 px-4 py-4.5 sm:flex-row sm:items-center sm:px-5">
                 <p className="text-center text-xs text-muted-foreground sm:text-left sm:text-sm">
                   Εμφάνιση{" "}
                   <span className="font-medium tabular-nums text-foreground">

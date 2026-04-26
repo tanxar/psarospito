@@ -15,6 +15,16 @@ function hasViewingAppointmentDelegate(client: PrismaClient): boolean {
   return d != null && typeof d === "object";
 }
 
+function hasListingBrokerOfferDelegate(client: PrismaClient): boolean {
+  const d = (client as unknown as Record<string, unknown>).listingBrokerOffer;
+  return d != null && typeof d === "object";
+}
+
+function hasListingPriceOfferDelegate(client: PrismaClient): boolean {
+  const d = (client as unknown as Record<string, unknown>).listingPriceOffer;
+  return d != null && typeof d === "object";
+}
+
 /** Υπογραφή scalar μοντέλων — αλλάζει μετά από `prisma generate` (νέα στήλη σε User, Listing κ.λπ.). */
 function prismaSchemaSignature(): string {
   try {
@@ -37,7 +47,12 @@ function getClient(): PrismaClient {
   const sig = prismaSchemaSignature();
   const g = globalThis.__prisma as CachedPrisma | undefined;
 
-  const ok = g && g.__schemaSig === sig && hasViewingAppointmentDelegate(g);
+  const ok =
+    g &&
+    g.__schemaSig === sig &&
+    hasViewingAppointmentDelegate(g) &&
+    hasListingBrokerOfferDelegate(g) &&
+    hasListingPriceOfferDelegate(g);
 
   if (ok) {
     return g;

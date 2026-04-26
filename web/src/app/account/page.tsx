@@ -2,25 +2,30 @@
 
 import type { ComponentType } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Building2,
   CalendarClock,
+  CircleDollarSign,
+  Clock3,
   ChevronRight,
   Heart,
   Home,
+  Inbox,
   LayoutList,
-  LogOut,
+  SendHorizontal,
   Plus,
   UserRound,
+  Users,
 } from "lucide-react";
 
 import { notifyAuthChanged, useSessionUser } from "@/components/auth/use-session";
 import { useSavedListings } from "@/components/saved/use-saved";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { SERVICE_REGION_LABELS, isValidServiceRegionId, type ServiceRegionId } from "@/lib/greek-service-regions";
 import { cn } from "@/lib/utils";
 
 function ActionTile({
@@ -40,28 +45,28 @@ function ActionTile({
     <Link
       href={href}
       className={cn(
-        "group relative flex gap-4 overflow-hidden rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm ring-1 ring-black/[0.02] transition-all duration-200",
-        "hover:border-primary/20 hover:shadow-md hover:ring-primary/[0.06] dark:bg-card/60"
+        "group flex items-start gap-3 rounded-xl border border-border bg-card p-4 transition-colors",
+        "hover:border-primary/30 hover:bg-muted/30"
       )}
     >
       <span
         className={cn(
-          "flex size-12 shrink-0 items-center justify-center rounded-xl border border-border/40 bg-primary/[0.08] text-primary transition-colors group-hover:bg-primary/[0.12]",
+          "flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/40 text-primary",
           iconClassName
         )}
       >
-        <Icon className="size-5" aria-hidden />
+        <Icon className="size-4.5" aria-hidden />
       </span>
       <span className="min-w-0 flex-1 text-left">
         <span className="flex items-start justify-between gap-2">
-          <span className="font-semibold tracking-tight text-foreground">{title}</span>
+          <span className="font-medium text-foreground">{title}</span>
           <ChevronRight
-            className="mt-0.5 size-4 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-primary/70"
+            className="mt-0.5 size-4 shrink-0 text-muted-foreground/60 transition group-hover:text-foreground"
             aria-hidden
           />
         </span>
         {description ? (
-          <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">{description}</span>
+          <span className="mt-1 block text-sm leading-snug text-muted-foreground">{description}</span>
         ) : null}
       </span>
     </Link>
@@ -89,28 +94,28 @@ function DashboardStat({
     <Link
       href={href}
       className={cn(
-        "group relative overflow-hidden rounded-2xl border border-border/55 bg-card/85 p-5 shadow-sm ring-1 ring-black/[0.03] transition-all",
-        "hover:border-primary/25 hover:shadow-md hover:ring-primary/[0.08] dark:bg-card/70"
+        "group rounded-xl border border-border bg-card p-4 transition-colors",
+        "hover:border-primary/30 hover:bg-muted/30"
       )}
     >
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3">
         <span
           className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-xl border border-border/45 bg-primary/[0.07] text-primary",
+            "flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/40 text-primary",
             iconClass
           )}
         >
-          <Icon className="size-5" aria-hidden />
+          <Icon className="size-4.5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-          <p className="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+          <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
             {loading ? <span className="inline-block animate-pulse text-muted-foreground">…</span> : value}
           </p>
-          {subline ? <p className="mt-1 text-xs text-muted-foreground">{subline}</p> : null}
+          {subline ? <p className="mt-1 text-xs leading-snug text-muted-foreground">{subline}</p> : null}
         </div>
         <ChevronRight
-          className="mt-1 size-4 shrink-0 text-muted-foreground/40 transition group-hover:translate-x-0.5 group-hover:text-primary/60"
+          className="mt-1 size-4 shrink-0 text-muted-foreground/60 transition group-hover:text-foreground"
           aria-hidden
         />
       </div>
@@ -121,33 +126,135 @@ function DashboardStat({
 type DashboardStats = {
   listingCount: number | null;
   appointmentCount: number | null;
+  pendingBrokerAssignmentCount: number | null;
+  incomingAssignmentCount: number | null;
+  incomingBrokerOfferCount: number | null;
+  incomingPriceOffersCount: number | null;
+  sentOffersCount: number | null;
   loading: boolean;
 };
 
+const REGION_ORDER: ServiceRegionId[] = [
+  "athens_metro",
+  "thessaloniki_metro",
+  "patras",
+  "larissa",
+  "heraklion",
+  "greece_other",
+  "greece_wide",
+];
+
 export default function AccountPage() {
-  const router = useRouter();
   const { user, ready } = useSessionUser();
   const saved = useSavedListings();
-  const [loggingOut, setLoggingOut] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileCompany, setProfileCompany] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileRegions, setProfileRegions] = useState<Set<ServiceRegionId>>(new Set());
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     listingCount: null,
     appointmentCount: null,
+    pendingBrokerAssignmentCount: null,
+    incomingAssignmentCount: null,
+    incomingBrokerOfferCount: null,
+    incomingPriceOffersCount: null,
+    sentOffersCount: null,
     loading: true,
   });
 
   const initial = user?.name?.trim().charAt(0).toUpperCase() ?? "?";
   const savedCount = saved.ids.length;
+  const brokerRegionLabels =
+    user?.role === "BROKER"
+      ? (user.brokerServiceRegions ?? [])
+          .map((id) => (id in SERVICE_REGION_LABELS ? SERVICE_REGION_LABELS[id as ServiceRegionId] : id))
+          .filter(Boolean)
+      : [];
+
+  useEffect(() => {
+    if (!user || user.role !== "BROKER") return;
+    setProfileCompany(user.brokerCompanyName ?? "");
+    setProfilePhone(user.brokerPhone ?? "");
+    const regions = (user.brokerServiceRegions ?? []).filter((id): id is ServiceRegionId => isValidServiceRegionId(id));
+    setProfileRegions(new Set(regions));
+  }, [user]);
+
+  function toggleRegion(id: ServiceRegionId) {
+    setProfileRegions((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function onSaveProfile() {
+    if (!user || user.role !== "BROKER" || profileSaving) return;
+    setProfileError(null);
+    setProfileSuccess(null);
+
+    if (profileRegions.size === 0) {
+      setProfileError("Διάλεξε τουλάχιστον μία περιοχή εξυπηρέτησης.");
+      return;
+    }
+
+    setProfileSaving(true);
+    try {
+      const res = await fetch("/api/auth/me", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          brokerCompanyName: profileCompany.trim(),
+          brokerPhone: profilePhone.trim(),
+          brokerServiceRegions: Array.from(profileRegions),
+        }),
+      });
+      const raw = await res.text();
+      let msg = "Αποτυχία αποθήκευσης";
+      try {
+        const j = JSON.parse(raw) as { error?: unknown };
+        if (typeof j?.error === "string" && j.error.trim()) msg = j.error.trim();
+      } catch {
+        if (raw.trim()) msg = raw.trim();
+      }
+      if (!res.ok) throw new Error(msg);
+      notifyAuthChanged();
+      setProfileSuccess("Τα στοιχεία ενημερώθηκαν.");
+      setEditingProfile(false);
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : "Αποτυχία αποθήκευσης");
+    } finally {
+      setProfileSaving(false);
+    }
+  }
 
   useEffect(() => {
     if (!user) return;
 
     let cancelled = false;
-    setStats({ listingCount: null, appointmentCount: null, loading: true });
+    setStats({
+      listingCount: null,
+      appointmentCount: null,
+      pendingBrokerAssignmentCount: null,
+      incomingAssignmentCount: null,
+      incomingBrokerOfferCount: null,
+      incomingPriceOffersCount: null,
+      sentOffersCount: null,
+      loading: true,
+    });
 
     void (async () => {
       try {
         let listingCount: number | null = null;
         let appointmentCount = 0;
+        let pendingBrokerAssignmentCount = 0;
+        let incomingAssignmentCount = 0;
+        let incomingBrokerOfferCount = 0;
+        let incomingPriceOffersCount = 0;
+        let sentOffersCount = 0;
 
         const apRes = await fetch("/api/appointments", { cache: "no-store" });
         if (apRes.ok) {
@@ -168,12 +275,66 @@ export default function AccountPage() {
           }
         }
 
+        if (user.role === "SEEKER") {
+          const pRes = await fetch("/api/listings/pending-broker-assignment", { cache: "no-store" });
+          if (pRes.ok) {
+            const arr = (await pRes.json()) as unknown;
+            pendingBrokerAssignmentCount = Array.isArray(arr) ? arr.length : 0;
+          }
+
+          const inRes = await fetch("/api/listings/incoming-broker-offers", { cache: "no-store" });
+          if (inRes.ok) {
+            const arr = (await inRes.json()) as unknown;
+            incomingBrokerOfferCount = Array.isArray(arr) ? arr.length : 0;
+          }
+        }
+
+        if (user.role === "BROKER" || user.role === "SEEKER") {
+          const priceRes = await fetch("/api/listings/incoming-price-offers", { cache: "no-store" });
+          if (priceRes.ok) {
+            const arr = (await priceRes.json()) as unknown;
+            incomingPriceOffersCount = Array.isArray(arr) ? arr.length : 0;
+          }
+        }
+
+        if (user.role === "BROKER") {
+          const bRes = await fetch("/api/brokers/incoming-assignment-requests", { cache: "no-store" });
+          if (bRes.ok) {
+            const arr = (await bRes.json()) as unknown;
+            incomingAssignmentCount = Array.isArray(arr) ? arr.length : 0;
+          }
+
+          const sentRes = await fetch("/api/brokers/sent-offers", { cache: "no-store" });
+          if (sentRes.ok) {
+            const arr = (await sentRes.json()) as unknown;
+            sentOffersCount = Array.isArray(arr) ? arr.length : 0;
+          }
+        }
+
         if (!cancelled) {
-          setStats({ listingCount, appointmentCount, loading: false });
+          setStats({
+            listingCount,
+            appointmentCount,
+            pendingBrokerAssignmentCount,
+            incomingAssignmentCount,
+            incomingBrokerOfferCount,
+            incomingPriceOffersCount,
+            sentOffersCount,
+            loading: false,
+          });
         }
       } catch {
         if (!cancelled) {
-          setStats({ listingCount: null, appointmentCount: null, loading: false });
+          setStats({
+            listingCount: null,
+            appointmentCount: null,
+            pendingBrokerAssignmentCount: null,
+            incomingAssignmentCount: null,
+            incomingBrokerOfferCount: null,
+            incomingPriceOffersCount: null,
+            sentOffersCount: null,
+            loading: false,
+          });
         }
       }
     })();
@@ -183,86 +344,56 @@ export default function AccountPage() {
     };
   }, [user]);
 
-  async function onLogout() {
-    if (loggingOut) return;
-    setLoggingOut(true);
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      notifyAuthChanged();
-      router.refresh();
-    } finally {
-      setLoggingOut(false);
-    }
-  }
-
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-gradient-to-b from-muted/40 via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
-      <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_45%_at_50%_-10%,rgba(59,130,246,0.07),transparent_50%),radial-gradient(ellipse_50%_35%_at_100%_60%,rgba(239,68,68,0.05),transparent),radial-gradient(ellipse_45%_35%_at_0%_70%,rgba(34,197,94,0.05),transparent)] dark:bg-[radial-gradient(ellipse_85%_45%_at_50%_-10%,rgba(59,130,246,0.12),transparent_50%)]"
-        aria-hidden
-      />
-
-      <div className="relative mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10 lg:px-8">
-        {/* Toolbar */}
-        <div className="flex flex-col gap-6 border-b border-border/40 pb-8 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex flex-wrap items-center gap-4">
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-14 pt-8 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
             <Link
               href="/"
               className={cn(
                 buttonVariants({ variant: "secondary", size: "sm" }),
-                "inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border-border/50 bg-background/90 px-4 shadow-sm ring-1 ring-border/35 backdrop-blur-sm hover:bg-muted/80"
+                "inline-flex h-9 items-center gap-2 rounded-lg"
               )}
             >
               <ArrowLeft className="size-4" aria-hidden />
               Αρχική
             </Link>
           </div>
-          <div className="text-right sm:max-w-md">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Πίνακας ελέγχου</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Ο λογαριασμός σου</h1>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Επισκόπηση αποθηκευμένων, αγγελιών και ραντεβού σε ένα μέρος.
-            </p>
+          <div className="sm:text-right">
+            <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">Ο λογαριασμός σου</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Αποθηκευμένα, αγγελίες και ραντεβού σε ένα σημείο.</p>
           </div>
         </div>
 
         {!ready ? (
-          <Card className="mt-10 overflow-hidden rounded-3xl border-border/50 bg-card/90 shadow-lg backdrop-blur-md">
-            <CardContent className="flex flex-col items-center gap-3 py-20 text-center">
+          <Card className="mt-8 rounded-xl border-border bg-card">
+            <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
               <div className="size-10 animate-pulse rounded-full bg-muted" aria-hidden />
               <p className="text-sm text-muted-foreground">Φόρτωση πίνακα…</p>
             </CardContent>
           </Card>
         ) : user ? (
-          <div className="mt-10 space-y-10">
-            {/* Profile hero */}
-            <section className="relative overflow-hidden rounded-3xl border border-border/50 bg-card/90 shadow-[0_24px_60px_-34px_rgba(15,23,42,0.35)] ring-1 ring-black/[0.04] backdrop-blur-md dark:bg-card/75 dark:shadow-[0_28px_70px_-36px_rgba(0,0,0,0.75)]">
-              <div
-                className="pointer-events-none absolute -right-20 -top-20 size-56 rounded-full bg-primary/[0.12] blur-3xl"
-                aria-hidden
-              />
-              <div
-                className="pointer-events-none absolute -bottom-16 -left-12 size-48 rounded-full bg-sky-500/10 blur-3xl"
-                aria-hidden
-              />
-              <div className="relative flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:gap-8 sm:p-8">
+          <div className="mt-8 space-y-7">
+            <section className="rounded-xl border border-border bg-card">
+              <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:p-6">
                 <div
-                  className="mx-auto flex size-20 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/20 via-primary/10 to-sky-500/10 text-2xl font-bold tracking-tight text-primary shadow-inner dark:from-primary/25 dark:via-primary/12"
+                  className="mx-auto flex size-16 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-xl font-semibold text-foreground sm:mx-0"
                   aria-hidden
                 >
                   {initial}
                 </div>
                 <div className="min-w-0 flex-1 text-center sm:text-left">
-                  <p className="text-sm text-muted-foreground">Καλώς ήρθες</p>
-                  <h2 className="mt-0.5 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{user.name}</h2>
-                  <p className="mt-1.5 truncate text-sm text-muted-foreground">{user.email}</p>
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                  <p className="text-sm text-muted-foreground">Λογαριασμός</p>
+                  <h2 className="mt-0.5 text-2xl font-semibold text-foreground">{user.name}</h2>
+                  <p className="mt-1 truncate text-sm text-muted-foreground">{user.email}</p>
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium",
+                        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
                         user.role === "BROKER"
-                          ? "border-primary/25 bg-primary/[0.08] text-primary"
-                          : "border-border/60 bg-muted/40 text-foreground"
+                          ? "border-primary/30 bg-primary/10 text-primary"
+                          : "border-border bg-muted/40 text-foreground"
                       )}
                     >
                       {user.role === "BROKER" ? (
@@ -277,90 +408,293 @@ export default function AccountPage() {
                         </>
                       )}
                     </span>
-                    {user.role === "BROKER" && user.brokerOnboardingCompleted ? (
-                      <span className="rounded-full border border-emerald-500/25 bg-emerald-500/[0.08] px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                        Προφίλ έτοιμο
-                      </span>
-                    ) : null}
                   </div>
                 </div>
+              </div>
+              <div className="border-t border-border px-5 py-5 sm:px-6">
+                {!editingProfile || user.role !== "BROKER" ? (
+                  <>
+                    {profileSuccess ? (
+                      <div className="mb-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
+                        {profileSuccess}
+                      </div>
+                    ) : null}
+                    <dl className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5">
+                        <dt className="text-xs font-medium text-muted-foreground">Ονοματεπώνυμο</dt>
+                        <dd className="mt-1 text-sm font-medium text-foreground">{user.name}</dd>
+                      </div>
+                      <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5">
+                        <dt className="text-xs font-medium text-muted-foreground">Email</dt>
+                        <dd className="mt-1 break-all text-sm text-foreground">{user.email}</dd>
+                      </div>
+                      <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5">
+                        <dt className="text-xs font-medium text-muted-foreground">Ρόλος</dt>
+                        <dd className="mt-1 text-sm text-foreground">{user.role === "BROKER" ? "Μεσίτης" : "Ιδιώτης"}</dd>
+                      </div>
+                      {user.role === "BROKER" ? (
+                        <>
+                          <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5">
+                            <dt className="text-xs font-medium text-muted-foreground">Επωνυμία γραφείου</dt>
+                            <dd className="mt-1 text-sm text-foreground">{user.brokerCompanyName?.trim() || "—"}</dd>
+                          </div>
+                          <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5">
+                            <dt className="text-xs font-medium text-muted-foreground">Τηλέφωνο</dt>
+                            <dd className="mt-1 text-sm text-foreground">{user.brokerPhone?.trim() || "—"}</dd>
+                          </div>
+                          <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5 sm:col-span-2">
+                            <dt className="text-xs font-medium text-muted-foreground">Περιοχές εξυπηρέτησης</dt>
+                            <dd className="mt-1 text-sm text-foreground">
+                              {brokerRegionLabels.length > 0 ? brokerRegionLabels.join(" · ") : "—"}
+                            </dd>
+                          </div>
+                        </>
+                      ) : null}
+                    </dl>
+                    {user.role === "BROKER" ? (
+                      <div className="mt-4">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="h-10 rounded-lg border-border"
+                          onClick={() => {
+                            setEditingProfile(true);
+                            setProfileError(null);
+                            setProfileSuccess(null);
+                          }}
+                        >
+                          Επεξεργασία στοιχείων
+                        </Button>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    {profileError ? (
+                      <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-foreground">
+                        {profileError}
+                      </div>
+                    ) : null}
+                    {profileSuccess ? (
+                      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
+                        {profileSuccess}
+                      </div>
+                    ) : null}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label htmlFor="account-company" className="text-xs font-medium text-muted-foreground">
+                          Επωνυμία γραφείου
+                        </label>
+                        <Input
+                          id="account-company"
+                          className="h-10 rounded-lg border-border/60"
+                          value={profileCompany}
+                          onChange={(e) => setProfileCompany(e.target.value)}
+                          placeholder="π.χ. Nestio Realty"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label htmlFor="account-phone" className="text-xs font-medium text-muted-foreground">
+                          Τηλέφωνο
+                        </label>
+                        <Input
+                          id="account-phone"
+                          className="h-10 rounded-lg border-border/60"
+                          type="tel"
+                          value={profilePhone}
+                          onChange={(e) => setProfilePhone(e.target.value)}
+                          placeholder="π.χ. 210 1234567 ή 6912345678"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Περιοχές εξυπηρέτησης</p>
+                      <div className="grid gap-2">
+                        {REGION_ORDER.map((id) => (
+                          <label
+                            key={id}
+                            className={cn(
+                              "flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm transition-colors",
+                              profileRegions.has(id)
+                                ? "border-primary/45 bg-primary/[0.06] ring-1 ring-primary/15"
+                                : "border-border/60 bg-background hover:border-border"
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 size-4 rounded border-border text-primary"
+                              checked={profileRegions.has(id)}
+                              onChange={() => toggleRegion(id)}
+                            />
+                            <span className="leading-snug text-foreground">{SERVICE_REGION_LABELS[id]}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <Button type="button" className="h-10 rounded-lg" disabled={profileSaving} onClick={() => void onSaveProfile()}>
+                        {profileSaving ? "Αποθήκευση…" : "Αποθήκευση"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="h-10 rounded-lg border-border"
+                        disabled={profileSaving}
+                        onClick={() => {
+                          setEditingProfile(false);
+                          setProfileError(null);
+                          setProfileSuccess(null);
+                          setProfileCompany(user.brokerCompanyName ?? "");
+                          setProfilePhone(user.brokerPhone ?? "");
+                          const regions = (user.brokerServiceRegions ?? []).filter((id): id is ServiceRegionId =>
+                            isValidServiceRegionId(id)
+                          );
+                          setProfileRegions(new Set(regions));
+                        }}
+                      >
+                        Ακύρωση
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
 
             {user.role === "BROKER" && !user.brokerOnboardingCompleted ? (
-              <div className="rounded-2xl border border-amber-400/35 bg-gradient-to-r from-amber-50/95 to-amber-100/50 px-5 py-5 shadow-sm dark:from-amber-950/40 dark:to-amber-900/20 dark:border-amber-500/25">
+              <div className="rounded-xl border border-amber-400/40 bg-amber-50/70 px-4 py-4 dark:border-amber-500/25 dark:bg-amber-950/20">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-semibold text-foreground">Ολοκλήρωσε το προφίλ μεσίτη</p>
+                    <p className="font-medium text-foreground">Ολοκλήρωσε το προφίλ μεσίτη</p>
                     <p className="mt-1 text-sm text-muted-foreground">Χωρίς στοιχεία γραφείου δεν μπορείς να δημοσιεύσεις αγγελίες.</p>
                   </div>
-                  <Link
-                    href="/account/broker-onboarding"
-                    className={cn(
-                      buttonVariants({ variant: "default" }),
-                      "h-11 shrink-0 justify-center rounded-xl px-6 shadow-md shadow-amber-900/10"
-                    )}
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setEditingProfile(true);
+                      setProfileError(null);
+                      setProfileSuccess(null);
+                    }}
+                    className="h-10 shrink-0 rounded-lg px-5"
                   >
-                    Συνέχεια ρύθμισης
-                  </Link>
+                    Συμπλήρωση εδώ
+                  </Button>
                 </div>
               </div>
             ) : null}
 
-            {/* KPI strip */}
             <section>
-              <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Σύνοψη</h3>
+              <h3 className="mb-3 text-sm font-medium text-foreground">Η δραστηριότητά σου</h3>
               <div className="grid gap-4 sm:grid-cols-3">
                 <DashboardStat
-                  href="/saved"
-                  icon={Heart}
-                  label="Αποθηκευμένα"
-                  value={savedCount}
-                  subline="Αγγελίες που έχεις σημειώσει"
-                  iconClass="border-red-500/20 bg-red-500/[0.08] text-red-600 dark:text-red-400"
+                  href="/account/viewings"
+                  icon={CalendarClock}
+                  label="Αιτήματα ραντεβού"
+                  value={stats.appointmentCount ?? 0}
+                  subline="Ως ενδιαφερόμενος ή οικοδεσπότης"
+                  loading={stats.loading}
+                  iconClass="border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400"
                 />
+                {user.role === "BROKER" || user.role === "SEEKER" ? (
+                  <DashboardStat
+                    href="/account/incoming-price-offers"
+                    icon={CircleDollarSign}
+                    label="Οικονομικές προσφορές · Εισερχόμενες"
+                    value={!stats.loading && stats.incomingPriceOffersCount == null ? "—" : (stats.incomingPriceOffersCount ?? 0)}
+                    subline="Προσφορές τιμής που έλαβαν οι αγγελίες σου"
+                    loading={stats.loading}
+                    iconClass="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                  />
+                ) : null}
+                {user.role === "BROKER" ? (
+                  <DashboardStat
+                    href="/account/assignment-requests"
+                    icon={Inbox}
+                    label="Αναθέσεις μεσίτη · Εισερχόμενα"
+                    value={!stats.loading && stats.incomingAssignmentCount == null ? "—" : (stats.incomingAssignmentCount ?? 0)}
+                    subline="Ιδιώτες που ζητούν να αναλάβεις αγγελία"
+                    loading={stats.loading}
+                    iconClass="border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-400"
+                  />
+                ) : null}
+                {user.role === "BROKER" ? (
+                  <DashboardStat
+                    href="/account/sent-offers"
+                    icon={SendHorizontal}
+                    label="Αναθέσεις μεσίτη · Απεσταλμένα"
+                    value={!stats.loading && stats.sentOffersCount == null ? "—" : (stats.sentOffersCount ?? 0)}
+                    subline="Αιτήματα που έστειλες και περιμένουν απάντηση"
+                    loading={stats.loading}
+                    iconClass="border-primary/30 bg-primary/10 text-primary"
+                  />
+                ) : null}
+                {user.role === "SEEKER" ? (
+                  <DashboardStat
+                    href="/account/incoming-broker-offers"
+                    icon={Users}
+                    label="Αναθέσεις μεσίτη · Προτάσεις που έλαβες"
+                    value={!stats.loading && stats.incomingBrokerOfferCount == null ? "—" : (stats.incomingBrokerOfferCount ?? 0)}
+                    subline="Μεσίτες που ζήτησαν να αναλάβουν αγγελίες σου"
+                    loading={stats.loading}
+                    iconClass="border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-400"
+                  />
+                ) : null}
+                {user.role === "SEEKER" ? (
+                  <DashboardStat
+                    href="/account/pending-broker-assignment"
+                    icon={Clock3}
+                    label="Αναθέσεις μεσίτη · Σε εκκρεμότητα"
+                    value={!stats.loading && stats.pendingBrokerAssignmentCount == null ? "—" : (stats.pendingBrokerAssignmentCount ?? 0)}
+                    subline="Αναμονή απάντησης ή τελικής επιβεβαίωσης"
+                    loading={stats.loading}
+                    iconClass="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                  />
+                ) : null}
+              </div>
+            </section>
+
+            <section>
+              <h3 className="mb-3 text-sm font-medium text-foreground">Οι αγγελίες σου</h3>
+              <div className="grid gap-4 sm:grid-cols-3">
                 {user.role === "BROKER" || user.role === "SEEKER" ? (
                   <DashboardStat
                     href="/listings/mine"
                     icon={LayoutList}
                     label="Οι αγγελίες μου"
                     value={!stats.loading && stats.listingCount === null ? "—" : (stats.listingCount ?? 0)}
-                    subline="Οι καταχωρήσεις σου"
+                    subline="Όλες οι καταχωρήσεις σου"
                     loading={stats.loading}
-                    iconClass="border-primary/25 bg-primary/[0.09]"
+                    iconClass="border-primary/30 bg-primary/10"
                   />
                 ) : (
                   <DashboardStat
                     href="/register/broker"
                     icon={Building2}
-                    label="Δημοσίευση"
+                    label="Δημοσίευση αγγελιών"
                     value="—"
-                    subline="Γίνε μεσίτης για καταχωρήσεις"
-                    iconClass="border-violet-500/20 bg-violet-500/[0.08] text-violet-700 dark:text-violet-400"
+                    subline="Γίνε μεσίτης για να καταχωρείς ακίνητα"
+                    iconClass="border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-400"
                   />
                 )}
                 <DashboardStat
-                  href="/account/viewings"
-                  icon={CalendarClock}
-                  label="Ραντεβού"
-                  value={stats.appointmentCount ?? 0}
-                  subline="Ως ενδιαφερόμενος ή οικοδεσπότης"
-                  loading={stats.loading}
-                  iconClass="border-sky-500/20 bg-sky-500/[0.08] text-sky-700 dark:text-sky-400"
+                  href="/saved"
+                  icon={Heart}
+                  label="Αποθηκευμένα"
+                  value={savedCount}
+                  subline="Αγγελίες που έχεις σημειώσει"
+                  iconClass="border-red-500/25 bg-red-500/10 text-red-600 dark:text-red-400"
                 />
               </div>
             </section>
 
-            {/* Quick actions */}
             <section>
-              <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Γρήγορες ενέργειες</h3>
+              <h3 className="mb-3 text-sm font-medium text-foreground">Γρήγορες ενέργειες</h3>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <ActionTile
                   href="/saved"
                   icon={Heart}
                   title="Αποθηκευμένα"
                   description="Η λίστα με τις αγγελίες που σου αρέσουν"
-                  iconClassName="bg-red-500/[0.08] text-red-600 dark:text-red-400"
+                  iconClassName="border-red-500/25 bg-red-500/10 text-red-600 dark:text-red-400"
                 />
                 <ActionTile
                   href="/account/viewings"
@@ -375,14 +709,14 @@ export default function AccountPage() {
                       icon={LayoutList}
                       title="Οι αγγελίες μου"
                       description="Διαχείριση καταχωρήσεων"
-                      iconClassName="bg-primary/[0.08] text-primary"
+                      iconClassName="border-primary/30 bg-primary/10 text-primary"
                     />
                     <ActionTile
                       href="/listings/new"
                       icon={Plus}
                       title="Νέα αγγελία"
                       description="Δημοσίευσε νέο ακίνητο"
-                      iconClassName="bg-emerald-600/[0.08] text-emerald-700 dark:text-emerald-400"
+                      iconClassName="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                     />
                   </>
                 ) : (
@@ -391,41 +725,22 @@ export default function AccountPage() {
                     icon={Building2}
                     title="Προφίλ μεσίτη"
                     description="Ολοκλήρωσε τα στοιχεία γραφείου"
-                    iconClassName="bg-amber-500/[0.12] text-amber-800 dark:text-amber-400"
+                    iconClassName="border-amber-500/30 bg-amber-500/12 text-amber-800 dark:text-amber-400"
                   />
                 )}
               </div>
             </section>
 
-            {/* Session */}
-            <Card className="overflow-hidden rounded-2xl border-border/50 bg-muted/25 shadow-sm ring-1 ring-border/30 dark:bg-muted/15">
-              <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Σύνοδος</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Αποσύνδεση από αυτή τη συσκευή.</p>
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="h-11 w-full shrink-0 rounded-xl border-border/50 hover:bg-destructive/10 hover:text-destructive sm:w-auto"
-                  disabled={loggingOut}
-                  onClick={() => void onLogout()}
-                >
-                  <LogOut className="size-4" aria-hidden />
-                  {loggingOut ? "Αποσύνδεση…" : "Αποσύνδεση"}
-                </Button>
-              </CardContent>
-            </Card>
           </div>
         ) : (
-          <Card className="mt-10 overflow-hidden rounded-3xl border-border/50 bg-card/95 shadow-xl ring-1 ring-border/25 backdrop-blur-md">
-            <CardContent className="space-y-8 p-6 sm:p-10">
+          <Card className="mt-8 rounded-xl border-border bg-card">
+            <CardContent className="space-y-7 p-6 sm:p-8">
               <div className="flex flex-col items-center text-center">
-                <div className="flex size-16 items-center justify-center rounded-2xl border border-border/50 bg-gradient-to-br from-primary/15 to-sky-500/10 text-primary shadow-sm">
+                <div className="flex size-14 items-center justify-center rounded-xl border border-border bg-muted/40 text-primary">
                   <UserRound className="size-8" aria-hidden />
                 </div>
-                <h2 className="mt-5 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">Δεν είσαι συνδεδεμένος</h2>
-                <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                <h2 className="mt-4 text-xl font-semibold text-foreground sm:text-2xl">Δεν είσαι συνδεδεμένος</h2>
+                <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
                   Οι αποθηκευμένες αγγελίες μένουν στον browser μέχρι να συνδεθείς.
                 </p>
               </div>
@@ -434,7 +749,7 @@ export default function AccountPage() {
                   href="/auth/email?next=%2Faccount"
                   className={cn(
                     buttonVariants({ variant: "default" }),
-                    "flex h-12 items-center justify-center gap-2 rounded-2xl text-[15px] shadow-lg shadow-primary/15"
+                    "flex h-11 items-center justify-center gap-2 rounded-lg text-[15px]"
                   )}
                 >
                   Σύνδεση / Εγγραφή
@@ -443,7 +758,7 @@ export default function AccountPage() {
                   href="/register/broker?next=%2Faccount"
                   className={cn(
                     buttonVariants({ variant: "secondary" }),
-                    "flex h-12 items-center justify-center gap-2 rounded-2xl border-border/60 bg-background ring-1 ring-border/30"
+                    "flex h-11 items-center justify-center gap-2 rounded-lg border-border bg-background"
                   )}
                 >
                   <Building2 className="size-4 text-primary" aria-hidden />

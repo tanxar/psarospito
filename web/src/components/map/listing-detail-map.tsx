@@ -26,6 +26,7 @@ export function ListingDetailMap({ listing }: { listing: Listing }) {
       activeId={listing.id}
       className="rounded-xl border-0 shadow-none sm:rounded-xl"
       mapLabel={precision === "exact" ? "Ακριβές σημείο" : "Περίπου εδώ"}
+      enableScrollWheelZoom={false}
       locationPrecision={precision}
     />
   );

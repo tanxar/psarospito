@@ -35,7 +35,10 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
     const row = await prisma.listing.findUnique({
       where: { id },
-      include: { images: { orderBy: { sortOrder: "asc" } } },
+      include: {
+        images: { orderBy: { sortOrder: "asc" } },
+        panoramas: { orderBy: { sortOrder: "asc" } },
+      },
     });
 
     if (!row) {
@@ -67,7 +70,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
     const existing = await prisma.listing.findUnique({
       where: { id },
-      include: { images: { orderBy: { sortOrder: "asc" } } },
+      include: {
+        images: { orderBy: { sortOrder: "asc" } },
+        panoramas: { orderBy: { sortOrder: "asc" } },
+      },
     });
     if (!existing) {
       return jsonError("Not found", 404);
@@ -96,6 +102,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           dealType?: unknown;
           images?: unknown;
           sourceImages?: unknown;
+          panoramaImages?: unknown;
           generateAiRedesigns?: unknown;
           aiVariantsPerImage?: unknown;
           addressLine?: unknown;
@@ -121,6 +128,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       coverImageSrc?: string;
       dealType?: string;
       images?: { deleteMany: Record<string, never>; create: { src: string; sortOrder: number }[] };
+      panoramas?: { deleteMany: Record<string, never>; create: { src: string; sortOrder: number }[] };
     } = {};
 
     if (typeof body.title === "string") {
@@ -181,6 +189,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const hasImageInput = Array.isArray(body.sourceImages) || Array.isArray(body.images);
     const currentImages = existing.images.map((img) => img.src);
     const uploadedImages = sourceImagesFromBody.length > 0 ? sourceImagesFromBody : imagesFromBody.length > 0 ? imagesFromBody : currentImages;
+    const panoramaImagesFromBody = parseImageList(body.panoramaImages);
+    const hasPanoramaInput = Array.isArray(body.panoramaImages);
 
     const generateAiRedesigns = body.generateAiRedesigns === true;
     const aiVariantsPerImage = Number(body.aiVariantsPerImage);
@@ -213,6 +223,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       data.images = {
         deleteMany: {},
         create: allListingImages.map((src, sortOrder) => ({ src, sortOrder })),
+      };
+    }
+    if (hasPanoramaInput) {
+      const allPanoramas = [...new Set(panoramaImagesFromBody)].slice(0, MAX_LISTING_IMAGES);
+      data.panoramas = {
+        deleteMany: {},
+        create: allPanoramas.map((src, sortOrder) => ({ src, sortOrder })),
       };
     }
 

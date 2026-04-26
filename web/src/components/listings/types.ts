@@ -10,6 +10,7 @@ export type Listing = {
   highlights: string[];
   imageSrc: string;
   images?: string[];
+  panoramaImages?: string[];
   /** "rent" = ενοικίαση, "sale" = πώληση */
   dealType?: "rent" | "sale";
   /** Προαιρετικό — π.χ. στη σελίδα «Οι αγγελίες μου» */

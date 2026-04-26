@@ -43,6 +43,10 @@ export function ListingBrokerInviteBanner({ listingId }: BannerProps) {
   const [loadingBrokers, setLoadingBrokers] = useState(false);
   const [brokerLoadError, setBrokerLoadError] = useState<string | null>(null);
   const [areaLabel, setAreaLabel] = useState<string | null>(null);
+  const [requestBusyBrokerId, setRequestBusyBrokerId] = useState<string | null>(null);
+  const [requestErr, setRequestErr] = useState<string | null>(null);
+  const [requestDone, setRequestDone] = useState<string | null>(null);
+  const [selectedBrokerId, setSelectedBrokerId] = useState<string | null>(null);
 
   const dismiss = useCallback(() => {
     setClosed(true);
@@ -83,6 +87,37 @@ export function ListingBrokerInviteBanner({ listingId }: BannerProps) {
       setBrokers([]);
     } finally {
       setLoadingBrokers(false);
+    }
+  }
+
+  async function requestBrokerCollaboration(brokerUserId: string) {
+    if (requestBusyBrokerId) return;
+    setRequestErr(null);
+    setRequestDone(null);
+    setRequestBusyBrokerId(brokerUserId);
+    try {
+      const res = await fetch(`/api/listings/${listingId}/broker-requests`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ brokerUserId }),
+      });
+      if (!res.ok) {
+        let msg = "Αποτυχία αποστολής αιτήματος";
+        try {
+          const j = (await res.json()) as { error?: unknown };
+          if (typeof j?.error === "string" && j.error.trim()) msg = j.error.trim();
+        } catch {
+          /* ignore */
+        }
+        throw new Error(msg);
+      }
+      setRequestDone("Το αίτημα στάλθηκε. Περιμένεις απάντηση από τον μεσίτη.");
+      setSelectedBrokerId(brokerUserId);
+      router.refresh();
+    } catch (e) {
+      setRequestErr(e instanceof Error ? e.message : "Σφάλμα");
+    } finally {
+      setRequestBusyBrokerId(null);
     }
   }
 
@@ -244,6 +279,21 @@ export function ListingBrokerInviteBanner({ listingId }: BannerProps) {
                             ) : (
                               <p className="text-xs text-muted-foreground">Δεν έχει δηλωθεί τηλέφωνο στο προφίλ.</p>
                             )}
+                            <div className="pt-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={requestBusyBrokerId != null || (selectedBrokerId != null && selectedBrokerId !== b.id)}
+                                onClick={() => void requestBrokerCollaboration(b.id)}
+                                className="h-9 rounded-lg px-3.5"
+                              >
+                                {requestBusyBrokerId === b.id
+                                  ? "Αποστολή…"
+                                  : selectedBrokerId === b.id
+                                    ? "Επιλέχθηκε"
+                                    : "Επιλογή μεσίτη"}
+                              </Button>
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
@@ -252,6 +302,16 @@ export function ListingBrokerInviteBanner({ listingId }: BannerProps) {
                 })}
               </ul>
             )}
+            {requestErr ? (
+              <p className="mt-3 text-sm text-destructive" role="alert">
+                {requestErr}
+              </p>
+            ) : null}
+            {requestDone ? (
+              <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400" role="status">
+                {requestDone}
+              </p>
+            ) : null}
           </div>
           </Dialog.Popup>
         </Dialog.Portal>

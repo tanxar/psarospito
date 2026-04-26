@@ -1,6 +1,6 @@
-import type { Listing, ListingImage } from "@prisma/client";
+import type { Listing, ListingImage, ListingPanorama } from "@prisma/client";
 
-export type ListingWithImages = Listing & { images: ListingImage[] };
+export type ListingWithImages = Listing & { images: ListingImage[]; panoramas: ListingPanorama[] };
 
 export function listingToJson(r: ListingWithImages) {
   return {
@@ -14,6 +14,7 @@ export function listingToJson(r: ListingWithImages) {
     highlights: Array.isArray(r.highlights) ? (r.highlights as string[]) : [],
     imageSrc: r.coverImageSrc,
     images: r.images.map((i) => i.src),
+    panoramaImages: r.panoramas.map((p) => p.src),
     dealType: r.dealType === "sale" ? ("sale" as const) : ("rent" as const),
     addressLine: r.addressLine ?? "",
     locationPrecision:

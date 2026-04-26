@@ -28,18 +28,18 @@ export function FiltersSheetBody({
 }) {
   const sqmRangeLabel =
     typeof filters.sqmMin === "number" || typeof filters.sqmMax === "number"
-      ? `${typeof filters.sqmMin === "number" ? `${filters.sqmMin} m²` : "Any"} - ${typeof filters.sqmMax === "number" ? `${filters.sqmMax} m²` : "Any"}`
-      : "Any";
+      ? `${typeof filters.sqmMin === "number" ? `${filters.sqmMin} m²` : "Οποιοδήποτε"} - ${typeof filters.sqmMax === "number" ? `${filters.sqmMax} m²` : "Οποιοδήποτε"}`
+      : "Οποιοδήποτε";
   const priceRangeLabel =
     typeof filters.priceMinEur === "number" || typeof filters.priceMaxEur === "number"
-      ? `${typeof filters.priceMinEur === "number" ? formatEur(filters.priceMinEur) : "Any"} - ${typeof filters.priceMaxEur === "number" ? formatEur(filters.priceMaxEur) : "Any"}`
-      : "Any";
+      ? `${typeof filters.priceMinEur === "number" ? formatEur(filters.priceMinEur) : "Οποιοδήποτε"} - ${typeof filters.priceMaxEur === "number" ? formatEur(filters.priceMaxEur) : "Οποιοδήποτε"}`
+      : "Οποιοδήποτε";
 
   return (
     <div className="space-y-4">
       <Card className="rounded-2xl border-border/60 bg-card/70 p-3 shadow-sm backdrop-blur">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-sm font-semibold">Price range</div>
+          <div className="text-sm font-semibold">Εύρος τιμής</div>
           <div className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[11px] font-medium text-foreground/80">
             {priceRangeLabel}
           </div>
@@ -47,7 +47,7 @@ export function FiltersSheetBody({
         <div className="mt-2.5 rounded-xl border border-border/60 bg-background/55 p-2.5">
           <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
           <div>
-            <div className="mb-1 text-[11px] font-medium text-muted-foreground">Min</div>
+            <div className="mb-1 text-[11px] font-medium text-muted-foreground">Ελάχιστο</div>
             <Select
               value={typeof filters.priceMinEur === "number" ? String(filters.priceMinEur) : "any"}
               onValueChange={(v) =>
@@ -58,10 +58,10 @@ export function FiltersSheetBody({
               }
             >
               <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background">
-                <SelectValue placeholder="Any" />
+                <SelectValue placeholder="Οποιοδήποτε" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="any">Any</SelectItem>
+                <SelectItem value="any">Οποιοδήποτε</SelectItem>
                 <SelectItem value="400">€400+</SelectItem>
                 <SelectItem value="600">€600+</SelectItem>
                 <SelectItem value="800">€800+</SelectItem>
@@ -73,10 +73,10 @@ export function FiltersSheetBody({
             </Select>
           </div>
 
-          <div className="hidden pb-2 text-[11px] text-muted-foreground sm:block">to</div>
+          <div className="hidden pb-2 text-[11px] text-muted-foreground sm:block">έως</div>
 
           <div>
-            <div className="mb-1 text-[11px] font-medium text-muted-foreground">Max</div>
+            <div className="mb-1 text-[11px] font-medium text-muted-foreground">Μέγιστο</div>
             <Select
               value={typeof filters.priceMaxEur === "number" ? String(filters.priceMaxEur) : "any"}
               onValueChange={(v) =>
@@ -87,17 +87,17 @@ export function FiltersSheetBody({
               }
             >
               <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background">
-                <SelectValue placeholder="Any" />
+                <SelectValue placeholder="Οποιοδήποτε" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="any">Any</SelectItem>
-                <SelectItem value="800">Up to {formatEur(800)}</SelectItem>
-                <SelectItem value="1000">Up to {formatEur(1000)}</SelectItem>
-                <SelectItem value="1200">Up to {formatEur(1200)}</SelectItem>
-                <SelectItem value="1500">Up to {formatEur(1500)}</SelectItem>
-                <SelectItem value="2000">Up to {formatEur(2000)}</SelectItem>
-                <SelectItem value="3000">Up to {formatEur(3000)}</SelectItem>
-                <SelectItem value="4000">Up to {formatEur(4000)}</SelectItem>
+                <SelectItem value="any">Οποιοδήποτε</SelectItem>
+                <SelectItem value="800">Έως {formatEur(800)}</SelectItem>
+                <SelectItem value="1000">Έως {formatEur(1000)}</SelectItem>
+                <SelectItem value="1200">Έως {formatEur(1200)}</SelectItem>
+                <SelectItem value="1500">Έως {formatEur(1500)}</SelectItem>
+                <SelectItem value="2000">Έως {formatEur(2000)}</SelectItem>
+                <SelectItem value="3000">Έως {formatEur(3000)}</SelectItem>
+                <SelectItem value="4000">Έως {formatEur(4000)}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -107,7 +107,7 @@ export function FiltersSheetBody({
 
       <Card className="rounded-2xl border-border/60 bg-card/70 p-3 shadow-sm backdrop-blur">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-sm font-semibold">Size range</div>
+          <div className="text-sm font-semibold">Εύρος εμβαδού</div>
           <div className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[11px] font-medium text-foreground/80">
             {sqmRangeLabel}
           </div>
@@ -115,7 +115,7 @@ export function FiltersSheetBody({
         <div className="mt-2.5 rounded-xl border border-border/60 bg-background/55 p-2.5">
           <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
             <div>
-              <div className="mb-1 text-[11px] font-medium text-muted-foreground">Min</div>
+              <div className="mb-1 text-[11px] font-medium text-muted-foreground">Ελάχιστο</div>
               <Select
                 value={typeof filters.sqmMin === "number" ? String(filters.sqmMin) : "any"}
                 onValueChange={(v) =>
@@ -126,10 +126,10 @@ export function FiltersSheetBody({
                 }
               >
                 <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background">
-                  <SelectValue placeholder="Any" />
+                  <SelectValue placeholder="Οποιοδήποτε" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="any">Any</SelectItem>
+                  <SelectItem value="any">Οποιοδήποτε</SelectItem>
                   <SelectItem value="20">20 m²+</SelectItem>
                   <SelectItem value="30">30 m²+</SelectItem>
                   <SelectItem value="40">40 m²+</SelectItem>
@@ -141,10 +141,10 @@ export function FiltersSheetBody({
               </Select>
             </div>
 
-            <div className="hidden pb-2 text-[11px] text-muted-foreground sm:block">to</div>
+            <div className="hidden pb-2 text-[11px] text-muted-foreground sm:block">έως</div>
 
             <div>
-              <div className="mb-1 text-[11px] font-medium text-muted-foreground">Max</div>
+              <div className="mb-1 text-[11px] font-medium text-muted-foreground">Μέγιστο</div>
               <Select
                 value={typeof filters.sqmMax === "number" ? String(filters.sqmMax) : "any"}
                 onValueChange={(v) =>
@@ -155,18 +155,18 @@ export function FiltersSheetBody({
                 }
               >
                 <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background">
-                  <SelectValue placeholder="Any" />
+                  <SelectValue placeholder="Οποιοδήποτε" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="any">Any</SelectItem>
-                  <SelectItem value="40">Up to 40 m²</SelectItem>
-                  <SelectItem value="50">Up to 50 m²</SelectItem>
-                  <SelectItem value="60">Up to 60 m²</SelectItem>
-                  <SelectItem value="80">Up to 80 m²</SelectItem>
-                  <SelectItem value="100">Up to 100 m²</SelectItem>
-                  <SelectItem value="120">Up to 120 m²</SelectItem>
-                  <SelectItem value="160">Up to 160 m²</SelectItem>
-                  <SelectItem value="200">Up to 200 m²</SelectItem>
+                  <SelectItem value="any">Οποιοδήποτε</SelectItem>
+                  <SelectItem value="40">Έως 40 m²</SelectItem>
+                  <SelectItem value="50">Έως 50 m²</SelectItem>
+                  <SelectItem value="60">Έως 60 m²</SelectItem>
+                  <SelectItem value="80">Έως 80 m²</SelectItem>
+                  <SelectItem value="100">Έως 100 m²</SelectItem>
+                  <SelectItem value="120">Έως 120 m²</SelectItem>
+                  <SelectItem value="160">Έως 160 m²</SelectItem>
+                  <SelectItem value="200">Έως 200 m²</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -175,7 +175,7 @@ export function FiltersSheetBody({
       </Card>
 
       <Card className="rounded-2xl border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur">
-        <div className="text-sm font-medium">Rooms</div>
+        <div className="text-sm font-medium">Δωμάτια</div>
         <div className="mt-3">
           <Select
             value={filters.rooms ?? ""}
@@ -184,10 +184,10 @@ export function FiltersSheetBody({
             }
           >
             <SelectTrigger className="h-12 rounded-xl bg-background/60">
-              <SelectValue placeholder="Any" />
+              <SelectValue placeholder="Οποιοδήποτε" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="studio">Studio</SelectItem>
+              <SelectItem value="studio">Στούντιο</SelectItem>
               <SelectItem value="1">1</SelectItem>
               <SelectItem value="2">2</SelectItem>
               <SelectItem value="3+">3+</SelectItem>
@@ -197,15 +197,15 @@ export function FiltersSheetBody({
       </Card>
 
       <Card className="rounded-2xl border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur">
-        <div className="text-sm font-medium">Features</div>
+        <div className="text-sm font-medium">Χαρακτηριστικά</div>
         <div className="mt-3 flex flex-wrap gap-2">
           {([
-            ["parking", "Parking"],
-            ["balcony", "Balcony"],
-            ["pets", "Pets"],
-            ["elevator", "Elevator"],
-            ["renovated", "Renovated"],
-            ["bright", "Bright"],
+            ["parking", "Πάρκινγκ"],
+            ["balcony", "Μπαλκόνι"],
+            ["pets", "Κατοικίδια"],
+            ["elevator", "Ασανσέρ"],
+            ["renovated", "Ανακαινισμένο"],
+            ["bright", "Φωτεινό"],
           ] as const).map(([key, label]) => {
             const active = filters[key] === true;
             return (
@@ -229,11 +229,11 @@ export function FiltersSheetBody({
       </Card>
 
       <Card className="rounded-2xl border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur">
-        <div className="text-sm font-medium">Location</div>
+        <div className="text-sm font-medium">Τοποθεσία</div>
         <div className="mt-3 flex flex-wrap gap-2">
           {([
-            ["nearMetro", "Near metro"],
-            ["nearTram", "Near tram"],
+            ["nearMetro", "Κοντά στο μετρό"],
+            ["nearTram", "Κοντά στο τραμ"],
           ] as const).map(([key, label]) => {
             const active = filters[key] === true;
             return (

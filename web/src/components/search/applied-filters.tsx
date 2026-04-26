@@ -8,23 +8,23 @@ type ClearKey = keyof Filters | "features" | "location";
 
 function humanize(filters: Filters): { key: ClearKey; label: string }[] {
   const out: { key: ClearKey; label: string }[] = [];
-  if (typeof filters.priceMinEur === "number") out.push({ key: "priceMinEur", label: `From €${filters.priceMinEur}` });
-  if (typeof filters.priceMaxEur === "number") out.push({ key: "priceMaxEur", label: `Up to €${filters.priceMaxEur}` });
-  if (typeof filters.sqmMin === "number") out.push({ key: "sqmMin", label: `From ${filters.sqmMin} m²` });
-  if (typeof filters.sqmMax === "number") out.push({ key: "sqmMax", label: `Up to ${filters.sqmMax} m²` });
-  if (filters.rooms) out.push({ key: "rooms", label: `${filters.rooms} rooms` });
+  if (typeof filters.priceMinEur === "number") out.push({ key: "priceMinEur", label: `Από €${filters.priceMinEur}` });
+  if (typeof filters.priceMaxEur === "number") out.push({ key: "priceMaxEur", label: `Έως €${filters.priceMaxEur}` });
+  if (typeof filters.sqmMin === "number") out.push({ key: "sqmMin", label: `Από ${filters.sqmMin} m²` });
+  if (typeof filters.sqmMax === "number") out.push({ key: "sqmMax", label: `Έως ${filters.sqmMax} m²` });
+  if (filters.rooms) out.push({ key: "rooms", label: `${filters.rooms} δωμάτια` });
   const feats: string[] = [];
-  if (filters.parking) feats.push("Parking");
-  if (filters.balcony) feats.push("Balcony");
-  if (filters.pets) feats.push("Pets");
-  if (filters.elevator) feats.push("Elevator");
-  if (filters.renovated) feats.push("Renovated");
-  if (filters.bright) feats.push("Bright");
+  if (filters.parking) feats.push("Πάρκινγκ");
+  if (filters.balcony) feats.push("Μπαλκόνι");
+  if (filters.pets) feats.push("Κατοικίδια");
+  if (filters.elevator) feats.push("Ασανσέρ");
+  if (filters.renovated) feats.push("Ανακαινισμένο");
+  if (filters.bright) feats.push("Φωτεινό");
   if (feats.length) out.push({ key: "features", label: feats.join(" · ") });
 
   const loc: string[] = [];
-  if (filters.nearMetro) loc.push("Near metro");
-  if (filters.nearTram) loc.push("Near tram");
+  if (filters.nearMetro) loc.push("Κοντά στο μετρό");
+  if (filters.nearTram) loc.push("Κοντά στο τραμ");
   if (loc.length) out.push({ key: "location", label: loc.join(" · ") });
 
   return out;
@@ -51,7 +51,7 @@ export function AppliedFilters({
           <button
             type="button"
             onClick={() => onClear(p.key)}
-            aria-label={`Clear ${p.label}`}
+            aria-label={`Καθαρισμός ${p.label}`}
             className="inline-flex size-4 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <X className="size-3" />

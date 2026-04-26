@@ -12,7 +12,9 @@ import { ListingDetailMap } from "@/components/map/listing-detail-map";
 import { ListingGallery } from "@/components/listings/listing-gallery";
 import type { Listing } from "@/components/listings/types";
 import { ListingBrokerInviteBanner } from "@/components/listings/listing-broker-invite-banner";
+import { ListingBrokerOfferPanel } from "@/components/listings/listing-broker-offer-panel";
 import { ListingOwnerResolvePanel } from "@/components/listings/listing-owner-resolve-panel";
+import { ListingPriceOffer } from "@/components/listings/listing-price-offer";
 import { ListingViewingBooking } from "@/components/listings/listing-viewing-booking";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -64,6 +66,7 @@ async function resolveListingDescription(
 
 function BrokerProfileInner({
   owner,
+  ownerId,
   completedListingsCount,
 }: {
   owner: {
@@ -72,6 +75,7 @@ function BrokerProfileInner({
     brokerCompanyName: string | null;
     brokerPhone: string | null;
   };
+  ownerId: string;
   /** Αγγελίες με «ενοικιάστηκε» / «πουλήθηκε» — υπολογίζεται από τη βάση */
   completedListingsCount?: number;
 }) {
@@ -97,9 +101,19 @@ function BrokerProfileInner({
           {initial}
         </div>
         <div className="min-w-0 flex-1 space-y-2.5">
-          <p className="text-[1.06rem] font-semibold leading-snug tracking-tight text-foreground sm:text-lg">
+          <Link
+            href={isBroker ? `/brokers/${ownerId}` : "#"}
+            className={cn(
+              "text-[1.06rem] font-semibold leading-snug tracking-tight sm:text-lg",
+              isBroker
+                ? "text-foreground underline-offset-4 hover:text-primary hover:underline"
+                : "pointer-events-none text-foreground"
+            )}
+            aria-disabled={!isBroker}
+            tabIndex={isBroker ? undefined : -1}
+          >
             {owner.name}
-          </p>
+          </Link>
           {isBroker && owner.brokerCompanyName ? (
             <p className="flex items-start gap-2 rounded-xl border border-border/35 bg-muted/35 py-2 pl-2.5 pr-2.5 text-[13px] leading-snug text-muted-foreground dark:bg-muted/20">
               <Building2 className="mt-0.5 size-3.5 shrink-0 text-primary/60" aria-hidden />
@@ -119,8 +133,16 @@ function BrokerProfileInner({
 }
 
 /** Preview: aspect 16/9 + γκαλερί (μία εικόνα τη φορά + βέλη / κουκκίδες). */
-function ListingPreviewBlock({ gallery, title }: { gallery: string[]; title: string }) {
-  return <ListingGallery images={gallery} alt={title} />;
+function ListingPreviewBlock({
+  gallery,
+  panoramas,
+  title,
+}: {
+  gallery: string[];
+  panoramas: string[];
+  title: string;
+}) {
+  return <ListingGallery images={gallery} panoramas={panoramas} alt={title} />;
 }
 
 export default async function ListingPage({
@@ -139,6 +161,7 @@ export default async function ListingPage({
     where: { id },
     include: {
       images: { orderBy: { sortOrder: "asc" } },
+      panoramas: { orderBy: { sortOrder: "asc" } },
       owner: {
         select: {
           id: true,
@@ -172,6 +195,7 @@ export default async function ListingPage({
 
   const highlights = listing && Array.isArray(listing.highlights) ? (listing.highlights as string[]) : [];
   const gallery = listing ? [listing.coverImageSrc, ...listing.images.map((i) => i.src)].filter(Boolean) : [];
+  const panoramas = listing ? listing.panoramas.map((p) => p.src).filter(Boolean) : [];
 
   const listingDateMeta =
     listing &&
@@ -193,6 +217,7 @@ export default async function ListingPage({
         highlights,
         imageSrc: listing.coverImageSrc,
         images: gallery,
+        panoramaImages: panoramas,
         dealType: listing.dealType === "sale" ? "sale" : "rent",
         addressLine: listing.addressLine ?? "",
         locationPrecision: listing.addressVisibility === "exact" ? "exact" : "approximate",
@@ -240,11 +265,65 @@ export default async function ListingPage({
   }
 
   const showOwnerEdit = !!listing && !!listing.ownerUserId && session?.id === listing.ownerUserId;
+  const sessionRole = session?.role ?? null;
+  const isBrokerViewer = sessionRole === "BROKER";
+  const ownerRole = listing?.owner?.role ?? null;
+
+  const ownerPendingOffers =
+    listing && showOwnerEdit && ownerRole === "SEEKER"
+      ? await prisma.listingBrokerOffer.findMany({
+          where: {
+            listingId: listing.id,
+            ownerUserId: session!.id,
+          },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            message: true,
+            direction: true,
+            status: true,
+            createdAt: true,
+            broker: {
+              select: {
+                id: true,
+                name: true,
+                brokerCompanyName: true,
+                brokerPhone: true,
+              },
+            },
+          },
+        })
+      : [];
+
+  const brokerOwnOffer =
+    listing && isBrokerViewer && session && listing.ownerUserId !== session.id && ownerRole === "SEEKER"
+      ? await prisma.listingBrokerOffer.findFirst({
+          where: {
+            listingId: listing.id,
+            brokerUserId: session.id,
+          },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, status: true, direction: true, message: true, createdAt: true },
+        })
+      : null;
+
+  const hasActiveOwnerBrokerRequest = ownerPendingOffers.some(
+    (offer) =>
+      offer.direction === "OWNER_TO_BROKER" &&
+      (offer.status === "PENDING" || offer.status === "BROKER_ACCEPTED")
+  );
+  const activeOwnerBrokerRequest =
+    ownerPendingOffers.find(
+      (offer) =>
+        offer.direction === "OWNER_TO_BROKER" &&
+        (offer.status === "PENDING" || offer.status === "BROKER_ACCEPTED")
+    ) ?? null;
 
   const showBrokerCoopBanner =
-    brokerInviteOn &&
     showOwnerEdit &&
-    listing?.owner?.role === "SEEKER";
+    listing?.owner?.role === "SEEKER" &&
+    listing?.isActive === true &&
+    !hasActiveOwnerBrokerRequest;
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
@@ -296,6 +375,25 @@ export default async function ListingPage({
               <Suspense fallback={null}>
                 <ListingBrokerInviteBanner listingId={listing.id} />
               </Suspense>
+            ) : hasActiveOwnerBrokerRequest ? (
+              <div className="rounded-2xl border border-primary/30 bg-primary/[0.08] px-4 py-3.5 text-sm text-foreground dark:text-primary-foreground">
+                <p className="font-semibold tracking-tight">
+                  Εκκρεμεί ανάθεση μεσίτη για τη συγκεκριμένη αγγελία.
+                </p>
+                <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+                  {activeOwnerBrokerRequest?.status === "BROKER_ACCEPTED"
+                    ? "Ο μεσίτης έχει αποδεχτεί το αίτημά σου και αναμένεται η τελική επιβεβαίωση από εσένα."
+                    : "Αναμένεται απάντηση από τον επιλεγμένο μεσίτη."}{" "}
+                  {activeOwnerBrokerRequest ? (
+                    <Link
+                      href={`/brokers/${activeOwnerBrokerRequest.broker.id}`}
+                      className="font-medium text-primary underline underline-offset-4"
+                    >
+                      {activeOwnerBrokerRequest.broker.name}
+                    </Link>
+                  ) : null}
+                </p>
+              </div>
             ) : null}
 
             <article className="grid min-w-0 grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_min(100%,340px)] lg:items-start lg:gap-x-14 lg:gap-y-0 xl:grid-cols-[minmax(0,1fr)_min(100%,360px)] xl:gap-x-16">
@@ -306,7 +404,7 @@ export default async function ListingPage({
                     aria-hidden
                   />
                   <div className="relative z-10 overflow-hidden rounded-2xl border border-border/55 bg-muted shadow-[0_28px_90px_-32px_rgba(0,48,135,0.22)] ring-1 ring-black/[0.04] dark:border-white/[0.08] dark:shadow-[0_36px_100px_-28px_rgba(0,0,0,0.75)] sm:rounded-3xl">
-                    <ListingPreviewBlock gallery={gallery} title={listing.title} />
+                    <ListingPreviewBlock gallery={gallery} panoramas={panoramas} title={listing.title} />
                   </div>
                 </div>
 
@@ -328,12 +426,61 @@ export default async function ListingPage({
                   </p>
 
                   {showOwnerEdit ? (
-                    <div className="mt-6 max-w-2xl">
+                    <div className="mt-6 max-w-2xl space-y-4">
+                      <ListingBrokerOfferPanel
+                        listingId={listing.id}
+                        ownerRole={ownerRole}
+                        isOwner={showOwnerEdit}
+                        userRole={sessionRole}
+                        userBrokerOnboardingCompleted={!!session?.brokerOnboardingCompleted}
+                        ownerPendingOffers={ownerPendingOffers.map((o) => ({
+                          id: o.id,
+                          createdAtIso: o.createdAt.toISOString(),
+                          message: o.message,
+                          direction: o.direction,
+                          status: o.status,
+                          broker: o.broker,
+                        }))}
+                        brokerOffer={
+                          brokerOwnOffer
+                            ? {
+                                id: brokerOwnOffer.id,
+                                direction: brokerOwnOffer.direction,
+                                status: brokerOwnOffer.status,
+                                message: brokerOwnOffer.message ?? null,
+                                createdAtIso: brokerOwnOffer.createdAt.toISOString(),
+                              }
+                            : null
+                        }
+                      />
                       <ListingOwnerResolvePanel
                         listingId={listing.id}
                         dealType={listing.dealType === "sale" ? "sale" : "rent"}
                         isActive={listing.isActive}
                         resolvedOutcome={listing.resolvedOutcome}
+                      />
+                    </div>
+                  ) : null}
+                  {!showOwnerEdit && sessionRole === "BROKER" && ownerRole === "SEEKER" ? (
+                    <div className="mt-6 max-w-2xl">
+                      <ListingBrokerOfferPanel
+                        listingId={listing.id}
+                        ownerRole={ownerRole}
+                        isOwner={false}
+                        userRole={sessionRole}
+                        userBrokerOnboardingCompleted={!!session?.brokerOnboardingCompleted}
+                        ownerPendingOffers={[]}
+                        brokerOffer={
+                          brokerOwnOffer
+                            ? {
+                                id: brokerOwnOffer.id,
+                                direction: brokerOwnOffer.direction,
+                                status: brokerOwnOffer.status,
+                                message: brokerOwnOffer.message ?? null,
+                                createdAtIso: brokerOwnOffer.createdAt.toISOString(),
+                              }
+                            : null
+                        }
                       />
                     </div>
                   ) : null}
@@ -414,6 +561,7 @@ export default async function ListingPage({
                       {listing.owner ? (
                         <BrokerProfileInner
                           owner={listing.owner}
+                          ownerId={listing.owner.id}
                           completedListingsCount={brokerCompletedListingsCount}
                         />
                       ) : (
@@ -430,7 +578,9 @@ export default async function ListingPage({
 
                     <div className="border-t border-border/35 bg-muted/[0.22] px-5 py-5 sm:px-6 sm:py-6 dark:bg-muted/[0.12]">
                       <div className="mb-4 flex items-center">
-                        <span className="text-sm font-semibold tracking-tight text-foreground">Επικοινωνία</span>
+                        <span className="text-sm font-semibold tracking-tight text-foreground">
+                          {showOwnerEdit ? "Διαχείριση αγγελίας" : "Επικοινωνία"}
+                        </span>
                       </div>
                       <ListingViewingBooking
                         listingId={listing.id}
@@ -439,6 +589,7 @@ export default async function ListingPage({
                         hostName={listing.owner?.name ?? null}
                         brokerPhone={listing.owner?.brokerPhone ?? null}
                       />
+                      <ListingPriceOffer listingId={listing.id} listingPriceEur={listing.priceEur} ownerUserId={listing.ownerUserId} />
                     </div>
 
                     <div className="border-t border-border/35 px-5 py-5 sm:px-6 sm:py-6">

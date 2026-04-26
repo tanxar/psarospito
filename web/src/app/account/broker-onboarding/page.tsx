@@ -52,12 +52,15 @@ export default function BrokerOnboardingPage() {
     }
     if (user.role !== "BROKER") {
       router.replace("/account");
-      return;
-    }
-    if (user.brokerOnboardingCompleted) {
-      router.replace("/account");
     }
   }, [ready, user, router]);
+
+  useEffect(() => {
+    if (!user || user.role !== "BROKER") return;
+    setCompany(user.brokerCompanyName ?? "");
+    setPhone(user.brokerPhone ?? "");
+    setServiceRegions(new Set((user.brokerServiceRegions ?? []) as ServiceRegionId[]));
+  }, [user]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -97,7 +100,7 @@ export default function BrokerOnboardingPage() {
     }
   }
 
-  const showForm = ready && user && user.role === "BROKER" && !user.brokerOnboardingCompleted;
+  const showForm = ready && user && user.role === "BROKER";
 
   if (!showForm) {
     return (
@@ -134,13 +137,15 @@ export default function BrokerOnboardingPage() {
           <div className="relative z-[1]">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground">
               <Building2 className="size-3.5 text-primary" aria-hidden />
-              Βήμα 1 από 1
+              {user.brokerOnboardingCompleted ? "Ενημέρωση προφίλ" : "Βήμα 1 από 1"}
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-[2rem] sm:leading-tight">
-              Προφίλ γραφείου
+              {user.brokerOnboardingCompleted ? "Επεξεργασία στοιχείων γραφείου" : "Προφίλ γραφείου"}
             </h1>
             <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
-              Λίγα στοιχεία για να ξεκινήσεις τις καταχωρήσεις. Μπορείς να τα επεξεργαστείς αργότερα από τον λογαριασμό.
+              {user.brokerOnboardingCompleted
+                ? "Ενημέρωσε τα στοιχεία σου. Οι αλλαγές ισχύουν άμεσα."
+                : "Λίγα στοιχεία για να ξεκινήσεις τις καταχωρήσεις. Μπορείς να τα επεξεργαστείς αργότερα από τον λογαριασμό."}
             </p>
           </div>
         </div>
@@ -216,7 +221,7 @@ export default function BrokerOnboardingPage() {
               </div>
 
               <Button type="submit" className="h-12 w-full rounded-xl" disabled={loading}>
-                {loading ? "Αποθήκευση…" : "Συνέχεια στον λογαριασμό"}
+                {loading ? "Αποθήκευση…" : user.brokerOnboardingCompleted ? "Αποθήκευση αλλαγών" : "Συνέχεια στον λογαριασμό"}
               </Button>
             </form>
           </CardContent>

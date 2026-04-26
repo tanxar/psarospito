@@ -15,7 +15,10 @@ export async function GET() {
     const rows = await prisma.listing.findMany({
       where: { ownerUserId: session.id },
       orderBy: { updatedAt: "desc" },
-      include: { images: { orderBy: { sortOrder: "asc" } } },
+      include: {
+        images: { orderBy: { sortOrder: "asc" } },
+        panoramas: { orderBy: { sortOrder: "asc" } },
+      },
     });
 
     return NextResponse.json(
